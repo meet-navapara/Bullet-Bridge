@@ -1,0 +1,51 @@
+rules_version = '2';
+
+// BOOMFORGE cloud saves: one document per player at players/{uid}.
+// A player can only read, write and delete their own document, and only
+// with the fields the game writes. Deploy with `firebase deploy --only
+// firestore:rules` or paste into Firebase console > Firestore > Rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /players/{uid} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+
+      function validSave() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(
+                 ['save', 'schemaVersion', 'updatedAtMs', 'updatedAt',
+                  'appVersion', 'platform'])
+          && d.save is map
+          && d.schemaVersion is int
+          && d.updatedAtMs is int
+          && d.updatedAt == request.time
+          && d.appVersion is string && d.appVersion.size() < 32
+          && d.platform is string && d.platform.size() < 16;
+      }
+
+      allow read, delete: if isOwner();
+      allow create, update: if isOwner() && validSave();
+    }
+
+    // Account-deletion and privacy requests from the website
+    // (website/delete-account.html). Anyone may submit one; nobody can read
+    // them from a client. Process them in the Firebase console.
+    match /deletionRequests/{id} {
+      allow create: if request.resource.data.keys().hasOnly(
+                         ['playerId', 'contact', 'note', 'createdAt'])
+        && request.resource.data.playerId is string
+        && request.resource.data.playerId.size() <= 64
+        && request.resource.data.contact is string
+        && request.resource.data.contact.size() <= 120
+        && request.resource.data.note is string
+        && request.resource.data.note.size() <= 1000
+        && request.resource.data.createdAt == request.time;
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

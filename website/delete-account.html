@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Delete BOOMFORGE Account</title>
+  <meta name="description" content="Delete your BOOMFORGE account and cloud save, or send a privacy request.">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="site">
+    <a class="brand" href="/">BOOMFORGE</a>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+      <a href="/delete-account" aria-current="page">Delete account</a>
+    </nav>
+  </header>
+
+  <h1>Delete your BOOMFORGE account</h1>
+  <p class="muted">This deletes your BOOMFORGE account and its cloud save:
+    levels, stars, scores, coins, upgrades, skins, settings and the linked
+    email address. It cannot be undone.</p>
+
+  <section class="panel">
+    <h2>Option 1: in the game (fastest)</h2>
+    <p>Open <b>Settings → Cloud Save → Delete Cloud Data</b>. Your account
+      and cloud save are deleted immediately.</p>
+  </section>
+
+  <section class="panel" id="google">
+    <h2>Option 2: Signed in with Google? Delete it here</h2>
+    <p>Sign in with the Google account you used in the game, then confirm.</p>
+    <div id="signed-out">
+      <button class="btn" id="sign-in">Sign in with Google</button>
+    </div>
+    <div id="signed-in" class="hidden">
+      <p>Signed in as <b id="who"></b>.</p>
+      <button class="btn red" id="delete">Delete my account and data</button>
+      <button class="btn navy" id="sign-out">Sign out</button>
+    </div>
+    <p class="status" id="google-status" role="status"></p>
+  </section>
+
+  <section class="panel" id="request">
+    <h2>Option 3: Playing as a guest? Send a request</h2>
+    <p>Guest accounts can't sign in on the web. Copy your <b>Player ID</b>
+      from Settings → Cloud Save in the game and send it below. We delete the
+      account and all of its data within 30 days. Uninstalled already? Send
+      the request without an ID and describe your account; we'll do our best
+      to find it.</p>
+    <p class="small muted">You can also use this form for other privacy
+      questions or requests.</p>
+    <form id="request-form">
+      <label for="player-id">Player ID</label>
+      <input id="player-id" name="playerId" maxlength="64" autocomplete="off"
+        placeholder="e.g. Xk3v9Qm2…">
+      <label for="contact">Your email (optional, only if you want a reply)</label>
+      <input id="contact" name="contact" type="email" maxlength="120" autocomplete="email">
+      <label for="note">Request</label>
+      <textarea id="note" name="note" rows="3" maxlength="1000">Please delete my BOOMFORGE account and all of its data.</textarea>
+      <p><button class="btn red" type="submit" id="send">Send request</button></p>
+    </form>
+    <p class="status" id="request-status" role="status"></p>
+  </section>
+
+  <section class="panel">
+    <h2>What is deleted and what is kept</h2>
+    <div class="table-scroll">
+      <table>
+        <tr><th>Data</th><th>What happens</th></tr>
+        <tr><td>Account (ID, linked Google email)</td><td>Deleted</td></tr>
+        <tr><td>Cloud save (progress, coins, upgrades, items, settings)</td><td>Deleted</td></tr>
+        <tr><td>Progress saved on your phone</td><td>Kept until you uninstall the game or use Settings → Reset Progress</td></tr>
+        <tr><td>Anonymous gameplay statistics and crash reports</td><td>Not linked to your account. They expire automatically: crash reports after 90 days, statistics after 14 months.</td></tr>
+        <tr><td>Deletion requests sent with this form</td><td>Deleted after the request is completed</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <a href="/">Home</a>
+    <a href="/privacy">Privacy Policy</a>
+    <a href="/terms">Terms of Service</a>
+    <p>&copy; 2026 BOOMFORGE</p>
+  </footer>
+</div>
+<script type="module" src="/delete-account.js"></script>
+</body>
+</html>

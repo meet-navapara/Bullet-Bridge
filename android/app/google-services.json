@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "182359966028",
+    "project_id": "ball-blast-d0a65",
+    "storage_bucket": "ball-blast-d0a65.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:182359966028:android:4f9174906bd20b4f92cfe9",
+        "android_client_info": {
+          "package_name": "com.boomforge.game"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "182359966028-19ens4587b2qc956d5igbjthi91fen01.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.boomforge.game",
+            "certificate_hash": "270dd6197d729efc4dc2d2ecb1794e7cce167018"
+          }
+        },
+        {
+          "client_id": "182359966028-u68md270fm7mk9oe0f1rm94lojjvdeo2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCaJxjICHQIlCFdgckkv-OyyXIE-hJ3_iE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "182359966028-u68md270fm7mk9oe0f1rm94lojjvdeo2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
