@@ -123,7 +123,7 @@ class EndlessPlan implements RunPlan {
       WaveDirector.buildPlan(number.toDouble(), Features.forWave(number), rng);
 }
 
-/// A campaign level (1-100) built from its [LevelDef].
+/// A campaign level (1 to [StageSpec.levelCount]) built from its [LevelDef].
 class StagePlan implements RunPlan {
   StagePlan(this.stage) : level = Campaign.level(stage);
   final int stage;
@@ -340,7 +340,10 @@ abstract final class WaveDirector {
           out.add(WaveSpawn(tier: tier, hp: hpFor(tier)));
         }
       case SpawnPattern.treasure:
-        final gold = level.has(Mechanic.treasure) ? 2 + level.chapter ~/ 4 : 0;
+        // Grows over the authored chapters only, to stay within the spawn cap.
+        final gold = level.has(Mechanic.treasure)
+            ? 2 + math.min(level.chapter, StageSpec.authoredChapters) ~/ 4
+            : 0;
         for (var i = 0; i < math.max(1, count - 1); i++) {
           final tier = i == 0 ? maxTier : randomTier();
           out.add(WaveSpawn(tier: tier, hp: hpFor(tier, 0.8)));

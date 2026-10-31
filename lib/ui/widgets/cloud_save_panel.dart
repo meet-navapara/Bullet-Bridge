@@ -6,6 +6,7 @@ import '../../services/cloud/cloud_sync.dart';
 import '../theme/palette.dart';
 import 'common.dart';
 import 'game_button.dart';
+import 'google_sign_in_button.dart';
 
 /// Settings section for cloud saves: status, Google sign-in (so progress
 /// survives reinstalls and moves to new phones), manual sync and deleting
@@ -27,6 +28,11 @@ class CloudSavePanel extends StatelessWidget {
             Palette.textMuted,
             'Cloud save is not available in this build. Progress is saved on this device.',
           ),
+          CloudStatus.signedOut => (
+            Icons.person_outline_rounded,
+            Palette.textMuted,
+            'Playing as a guest. Progress stays on this phone and is lost if you uninstall. Sign in to keep it on any phone.',
+          ),
           CloudStatus.connecting || CloudStatus.syncing => (
             Icons.cloud_sync_rounded,
             Palette.cyan,
@@ -37,7 +43,7 @@ class CloudSavePanel extends StatelessWidget {
             Palette.green,
             account?.linked == true
                 ? 'Saved to your Google account${account?.email == null ? '' : ' (${account!.email})'}.'
-                : 'Saved to the cloud. Sign in with Google to keep it if you reinstall or change phones.',
+                : 'Saved to the cloud. Sign in to keep it if you reinstall or change phones.',
           ),
           CloudStatus.offline => (
             Icons.cloud_queue_rounded,
@@ -73,9 +79,7 @@ class CloudSavePanel extends StatelessWidget {
               if (cloud.enabled) ...[
                 const SizedBox(height: Gaps.md),
                 if (account?.linked != true)
-                  GameButton(
-                    label: 'Sign in with Google',
-                    tone: ButtonTone.green,
+                  GoogleSignInButton(
                     height: 46,
                     fontSize: 17,
                     onPressed:
@@ -84,34 +88,44 @@ class CloudSavePanel extends StatelessWidget {
                         ? null
                         : () => _link(context),
                   ),
-                const SizedBox(height: Gaps.sm),
-                Row(
-                  children: [
-                    Expanded(
-                      child: GameButton(
-                        label: 'Sync Now',
-                        tone: ButtonTone.navy,
-                        height: 42,
-                        fontSize: 15,
-                        onPressed: cloud.status == CloudStatus.syncing
-                            ? null
-                            : () => cloud.syncNow(),
+                if (account != null) ...[
+                  const SizedBox(height: Gaps.sm),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GameButton(
+                          label: 'Sync Now',
+                          tone: ButtonTone.navy,
+                          height: 42,
+                          fontSize: 15,
+                          onPressed: cloud.status == CloudStatus.syncing
+                              ? null
+                              : () => cloud.syncNow(),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: Gaps.sm),
-                    Expanded(
-                      child: GameButton(
-                        label: 'Delete Cloud Data',
-                        tone: ButtonTone.red,
-                        height: 42,
-                        fontSize: 15,
-                        onPressed: account == null
-                            ? null
-                            : () => _delete(context),
+                      const SizedBox(width: Gaps.sm),
+                      Expanded(
+                        child: GameButton(
+                          label: 'Delete Cloud Data',
+                          tone: ButtonTone.red,
+                          height: 42,
+                          fontSize: 15,
+                          onPressed: () => _delete(context),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                  const SizedBox(height: Gaps.sm),
+                  GameButton(
+                    label: 'Sign Out',
+                    tone: ButtonTone.navy,
+                    height: 42,
+                    fontSize: 15,
+                    onPressed: cloud.status == CloudStatus.syncing
+                        ? null
+                        : () => _signOut(context),
+                  ),
+                ],
               ],
             ],
           ),
@@ -123,7 +137,7 @@ class CloudSavePanel extends StatelessWidget {
   Future<void> _link(BuildContext context) async {
     final services = AppScope.of(context);
     try {
-      final linked = await services.cloud.linkGoogle();
+      final linked = await services.signInWithGoogle();
       if (linked) services.analytics.cloudLinked();
       if (context.mounted && linked) {
         showToast(context, 'Progress saved to your Google account.');
@@ -135,6 +149,31 @@ class CloudSavePanel extends StatelessWidget {
           e is CloudFailure
               ? e.message
               : 'Could not sign in. Check your connection and try again.',
+          color: Palette.coral,
+        );
+      }
+    }
+  }
+
+  Future<void> _signOut(BuildContext context) async {
+    final services = AppScope.of(context);
+    final ok = await confirmDialog(
+      context,
+      title: 'Sign out?',
+      message:
+          'Your cloud save stays safe for your next sign-in. Until then, you '
+          'play as a guest and new progress stays on this phone.',
+      confirmLabel: 'Sign Out',
+    );
+    if (!ok || !context.mounted) return;
+    try {
+      await services.signOut();
+      if (context.mounted) showToast(context, 'Signed out.');
+    } catch (_) {
+      if (context.mounted) {
+        showToast(
+          context,
+          'Could not sign out. Try again.',
           color: Palette.coral,
         );
       }
@@ -153,7 +192,7 @@ class CloudSavePanel extends StatelessWidget {
     );
     if (!ok || !context.mounted) return;
     try {
-      await services.cloud.deleteCloudData();
+      await services.deleteCloudData();
       if (context.mounted) showToast(context, 'Cloud data deleted.');
     } catch (_) {
       if (context.mounted) {

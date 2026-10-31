@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../progress/save_data.dart';
 import 'cloud_backend.dart';
@@ -22,6 +24,9 @@ class FirebaseCloudBackend implements CloudBackend {
 
   static const collection = 'players';
 
+  /// [GoogleSignIn.initialize] may only run once per app launch.
+  static Future<void>? _googleReady;
+
   FirebaseAuth get _auth => FirebaseAuth.instance;
   FirebaseFirestore get _db => FirebaseFirestore.instance;
 
@@ -41,8 +46,15 @@ class FirebaseCloudBackend implements CloudBackend {
 
   @override
   Future<CloudAccount> signIn() async {
-    final user = _auth.currentUser ?? (await _auth.signInAnonymously()).user!;
+    final user = _auth.currentUser;
+    if (user == null) throw const CloudFailure('Not signed in.');
     return _account(user);
+  }
+
+  @override
+  Future<void> signOut() async {
+    await _auth.signOut();
+    await _forgetGoogleAccount();
   }
 
   @override
@@ -87,45 +99,67 @@ class FirebaseCloudBackend implements CloudBackend {
     _ => 'Google sign-in failed (${e.code}). Try again.',
   };
 
-  Future<CloudAccount> _linkGoogle() async {
-    final provider = GoogleAuthProvider();
-    var user = _auth.currentUser;
-    if (user == null) {
-      try {
-        user = (await _auth.signInAnonymously()).user!;
-      } on FirebaseAuthException catch (e) {
-        // Guest accounts switched off: sign in with Google directly.
-        if (e.code != 'admin-restricted-operation' &&
-            e.code != 'operation-not-allowed') {
-          rethrow;
-        }
-        return _account((await _auth.signInWithProvider(provider)).user!);
+  /// Shows the phone's own Google account sheet, so no web page or Firebase
+  /// address appears. The web client ID comes from google-services.json.
+  Future<AuthCredential> _googleCredential() async {
+    await (_googleReady ??= GoogleSignIn.instance.initialize());
+    try {
+      final account = await GoogleSignIn.instance.authenticate();
+      final idToken = account.authentication.idToken;
+      if (idToken == null) {
+        throw const CloudFailure('Google sign-in failed. Try again.');
+      }
+      return GoogleAuthProvider.credential(idToken: idToken);
+    } on GoogleSignInException catch (e) {
+      switch (e.code) {
+        case GoogleSignInExceptionCode.canceled:
+        case GoogleSignInExceptionCode.interrupted:
+          throw const CloudCancelled();
+        default:
+          debugPrint('Google sign-in failed: ${e.code} ${e.description}');
+          throw CloudFailure(
+            'Google sign-in failed (${e.code.name}). Try again.',
+          );
       }
     }
+  }
+
+  Future<CloudAccount> _linkGoogle() async {
+    final credential = await _googleCredential();
+    // Installs from before the welcome screen may still hold an anonymous
+    // account: link it, so its cloud save is kept.
+    final user = _auth.currentUser;
     try {
-      final result = await user.linkWithProvider(provider);
+      final result = user == null
+          ? await _auth.signInWithCredential(credential)
+          : await user.linkWithCredential(credential);
       return _account(result.user!);
     } on FirebaseAuthException catch (e) {
       switch (e.code) {
         case 'provider-already-linked':
-          return _account(user);
+          return _account(user!);
         case 'credential-already-in-use':
         case 'email-already-in-use':
           // This Google account already has a save (another phone or an
           // earlier install): switch to it. The caller merges this
           // device's progress into it, so nothing is lost.
-          final credential = e.credential;
-          final result = credential != null
-              ? await _auth.signInWithCredential(credential)
-              : await _auth.signInWithProvider(provider);
+          final result = await _auth.signInWithCredential(
+            e.credential ?? credential,
+          );
           return _account(result.user!);
-        case 'web-context-canceled':
-        case 'canceled':
-        case 'popup-closed-by-user':
-          throw const CloudCancelled();
         default:
           rethrow;
       }
+    }
+  }
+
+  /// Makes the next sign-in offer the account sheet again.
+  Future<void> _forgetGoogleAccount() async {
+    try {
+      await (_googleReady ??= GoogleSignIn.instance.initialize());
+      await GoogleSignIn.instance.signOut();
+    } catch (e) {
+      debugPrint('Google sign-out failed: $e');
     }
   }
 
@@ -137,10 +171,18 @@ class FirebaseCloudBackend implements CloudBackend {
     try {
       await user.delete();
     } on FirebaseAuthException catch (e) {
-      // Deleting a long-signed-in account needs a fresh sign-in; the data
-      // is already gone, so just sign out.
       if (e.code != 'requires-recent-login') rethrow;
+      // A long-signed-in account needs a fresh sign-in to be deleted. If the
+      // player refuses, the save is already gone; the website's delete page
+      // covers the empty account that remains.
+      try {
+        await user.reauthenticateWithCredential(await _googleCredential());
+        await user.delete();
+      } catch (e) {
+        debugPrint('Account deletion needs a fresh sign-in: $e');
+      }
     }
     await _auth.signOut();
+    await _forgetGoogleAccount();
   }
 }

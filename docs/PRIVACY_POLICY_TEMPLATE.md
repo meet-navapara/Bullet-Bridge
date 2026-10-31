@@ -19,15 +19,13 @@ information. Uninstalling the app or using "Reset Progress" deletes it.
 
 ## Cloud save and accounts (Google Firebase)
 
-To back up your progress, the game creates an anonymous account with
-Google Firebase Authentication and stores a copy of your game progress in
-Google Cloud Firestore. The copy contains levels, stars, scores, coins,
-upgrades, unlocked items, game settings and timestamps. The game does not
-ask for your name or email.
+As a guest, no account is created and your progress stays on your device.
 
-If you choose "Sign in with Google", your Google account's email address
-and account ID are linked to your save, so you can restore your progress
-after reinstalling or on another phone.
+If you choose "Continue with Google", your Google account's email address,
+name and account ID are stored with Google Firebase Authentication, and a copy
+of your game progress is stored in Google Cloud Firestore, so you can restore
+it after reinstalling or on another phone. The copy contains levels, stars,
+scores, coins, upgrades, unlocked items, game settings and timestamps.
 
 You can delete your cloud save and account at any time in the game:
 Settings → Cloud Save → Delete Cloud Data. You can also ask us to delete it
@@ -58,8 +56,10 @@ https://policies.google.com/technologies/partner-sites
 
 ## Analytics
 
-The game uses Google Analytics for Firebase to count anonymous gameplay
-events: levels started and finished, bosses defeated, upgrades bought.
+The game uses Google Analytics for Firebase to record how the game is used:
+screens opened, buttons tapped, the guest or Google choice, levels started and
+finished, bosses defeated, elements and power-ups used, ads watched, upgrades
+and items bought. These go with an app-instance ID, not your name or email.
 It uses Firebase Crashlytics to receive crash reports, which contain
 technical device information and the state of the app at the crash. This
 helps us balance levels and fix bugs. You can turn both off in Settings →

@@ -68,21 +68,21 @@ void main() {
     final boss =
         Boss(
             def: Bosses.of(BossId.crystalColossus),
-            coreMax: 300,
-            plateMax: 10,
+            balls: List.filled(30, 0),
+            throwInterval: 2,
             homeY: 200,
             x: 60,
           )
-          ..plates[0] = 0
-          ..plates[1] = 0
-          ..core = 201
+          ..unitsLeft = 21
           ..slam = SlamState.diving;
     boss.y = sim.floorY - boss.coreRadius;
     sim.boss = boss;
     sim.invulnerableTimer = 100; // keep the cannon out of the way
     sim.cannonX = 300;
-    // A hit that crosses the 2/3 threshold mid-slam.
-    sim.bullets.add(Bullet(boss.x, boss.y + boss.coreRadius + 2, 5));
+    // A ball destroyed that crosses the 2/3 threshold mid-slam.
+    final ball = Ball(id: 1, tier: 0, maxHp: 1, x: 200, y: 200, vx: 0, vy: 0);
+    sim.balls.add(ball);
+    sim.damageBall(ball, 5);
     sim.step(Physics.fixedStep);
     expect(boss.phase, 2);
     final floorY = boss.y;

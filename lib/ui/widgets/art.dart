@@ -7,6 +7,7 @@ import '../../render/cannon_art.dart';
 import '../../render/crystal_art.dart';
 import '../../render/hud_art.dart';
 import '../../render/icon_art.dart';
+import '../../render/menu_icon_art.dart';
 import '../../render/world_art.dart';
 
 /// The illustrated world (sky, mountains, hills, ground) behind menus.
@@ -137,6 +138,21 @@ class HeartIcon extends StatelessWidget {
         filled: filled,
       ),
       Object.hash(filled, size),
+    ),
+  );
+}
+
+class MenuIconView extends StatelessWidget {
+  const MenuIconView({super.key, required this.icon, this.size = 44});
+  final MenuIcon icon;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+    size: Size.square(size),
+    painter: _FnPainter(
+      (c, s) => MenuIconArt.draw(c, icon, s.shortestSide),
+      Object.hash(icon, size),
     ),
   );
 }

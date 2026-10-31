@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- appCategory="game" keeps the portrait lock on tablets: from target SDK
+         36, Android ignores orientation limits on large screens except for games. -->
     <application
-        android:label="Boomforge"
+        android:appCategory="game"
+        android:label="BOOMFORGE"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

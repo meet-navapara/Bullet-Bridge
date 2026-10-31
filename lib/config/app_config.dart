@@ -45,7 +45,10 @@ abstract final class AppConfig {
     'DELETE_ACCOUNT_URL',
     defaultValue: '$websiteUrl/delete-account',
   );
-  static const String supportEmail = String.fromEnvironment('SUPPORT_EMAIL');
+  static const String supportEmail = String.fromEnvironment(
+    'SUPPORT_EMAIL',
+    defaultValue: 'navaparameetdev@gmail.com',
+  );
 
   /// Upper bound for the splash screen so the player never waits forever.
   static const Duration initTimeout = Duration(seconds: 8);

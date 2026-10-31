@@ -10,6 +10,9 @@ import 'cloud_backend.dart';
 enum CloudStatus {
   /// Firebase is not configured for this build: local saves only.
   disabled,
+
+  /// Playing as a guest: progress stays on this device.
+  signedOut,
   connecting,
   synced,
   syncing,
@@ -18,10 +21,11 @@ enum CloudStatus {
   offline,
 }
 
-/// Keeps the player's progress in the cloud.
+/// Keeps a signed-in player's progress in the cloud. Guests never reach it:
+/// nothing runs until [start] or [linkGoogle] is called.
 ///
-/// - On start: signs in, downloads the cloud save, merges it with this
-///   device's save ([PlayerProgress.mergeFrom]) and uploads the result.
+/// - On start: restores the account, downloads the cloud save, merges it with
+///   this device's save ([PlayerProgress.mergeFrom]) and uploads the result.
 /// - After every local change (a finished run, a purchase…): uploads,
 ///   debounced so a burst of changes costs one write.
 /// - When the app goes to the background: uploads immediately.
@@ -34,7 +38,7 @@ class CloudSync extends ChangeNotifier {
     required this.progress,
     this.debounce = const Duration(seconds: 4),
   }) : _backend = backend,
-       _status = backend == null ? CloudStatus.disabled : CloudStatus.offline;
+       _status = backend == null ? CloudStatus.disabled : CloudStatus.signedOut;
 
   /// Cloud saves are off (no backend).
   CloudSync.disabled({required this.progress})
@@ -66,13 +70,17 @@ class CloudSync extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Signs in and performs the first sync. Safe to call more than once.
+  void _listen() {
+    if (_started) return;
+    _started = true;
+    progress.addListener(_onLocalChange);
+  }
+
+  /// Restores the account and performs the first sync. Safe to call more than
+  /// once.
   Future<void> start() async {
     if (_backend == null) return;
-    if (!_started) {
-      _started = true;
-      progress.addListener(_onLocalChange);
-    }
+    _listen();
     await syncNow();
   }
 
@@ -109,47 +117,76 @@ class CloudSync extends ChangeNotifier {
     });
   }
 
-  /// Links this player to a Google account. If that account already has
-  /// a save, both saves are merged. Returns false if the player cancelled.
+  /// Signs this player in with Google. If that account already has a save,
+  /// both saves are merged. Returns false if the player cancelled.
+  ///
+  /// A sign-in that succeeds counts even if the first sync then fails: the
+  /// sync is retried later, like any other.
   Future<bool> linkGoogle() async {
     final backend = _backend;
     if (backend == null) return false;
+    _listen();
     var linked = false;
     await _serial(() async {
+      // A refused sign-in leaves the player as they were.
+      void restore() =>
+          _set(_account == null ? CloudStatus.signedOut : CloudStatus.synced);
       _set(CloudStatus.syncing);
       try {
         _account = await backend.linkGoogle();
+        linked = true;
+      } on CloudCancelled {
+        restore();
+        return;
+      } on CloudFailure {
+        restore();
+        rethrow;
+      } catch (e) {
+        debugPrint('Google sign-in failed: $e');
+        restore();
+        rethrow;
+      }
+      try {
         await _pullAndMerge(backend);
         await _push(backend);
         _lastSynced = DateTime.now();
-        linked = true;
         _set(CloudStatus.synced);
-      } on CloudCancelled {
-        _set(CloudStatus.synced);
-      } on CloudFailure {
-        // Sign-in was refused, but the existing save is still in sync.
-        _set(_account == null ? CloudStatus.offline : CloudStatus.synced);
-        rethrow;
       } catch (e) {
-        debugPrint('Google link failed: $e');
+        debugPrint('Cloud sync failed: $e');
+        _dirty = true;
         _set(CloudStatus.offline);
-        rethrow;
       }
     });
     notifyListeners();
     return linked;
   }
 
+  /// Uploads what is pending, then signs out. Progress stays on this device
+  /// and the cloud save stays for the next sign-in.
+  Future<void> signOut() async {
+    final backend = _backend;
+    if (backend == null) return;
+    await flush();
+    await _serial(() async {
+      await backend.signOut();
+      _timer?.cancel();
+      _account = null;
+      _dirty = false;
+      _set(CloudStatus.signedOut);
+    });
+  }
+
   /// Deletes the cloud copy and the account. Local progress stays on this
-  /// device; a fresh anonymous account is created on the next sync.
+  /// device, which goes back to playing as a guest.
   Future<void> deleteCloudData() async {
     final backend = _backend;
     if (backend == null) return;
     await _serial(() async {
       await backend.deleteAccount();
+      _timer?.cancel();
       _account = null;
       _dirty = false;
-      _set(CloudStatus.offline);
+      _set(CloudStatus.signedOut);
     });
   }
 

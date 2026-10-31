@@ -1,4 +1,4 @@
-// Plays the whole 100-level campaign with the scripted AutoPlayer and a
+// Plays the whole campaign with the scripted AutoPlayer and a
 // realistic economy: the player starts with nothing, buys upgrades only
 // with coins earned in play (run coins, clear bonuses, boss rewards), and
 // replays the previous level to earn more after a failure. Writes the
@@ -40,11 +40,11 @@ RunStats play(
 }) {
   final sim = GameSimulation(
     loadout: loadout,
-    seed: SeededRandom.hashString('boomforge-stage-$level'),
+    seed: SeededRandom.hashString('boomforge-stage-$level') + attempt - 1,
     arenaHeight: 760,
     plan: StagePlan(level),
   );
-  // Each retry plays a little differently, like a person would.
+  // Each retry plays out differently (seed and steering), like a person's.
   final player = AutoPlayer(
     maxSpeed: 520 - 40.0 * ((attempt - 1) % 3),
     lookAhead: 0.9 + 0.1 * ((attempt - 1) % 2),
@@ -189,7 +189,8 @@ void main() {
     }
     final d = progress.data;
     final summary =
-        'Campaign: cleared ${d.highestStageCleared}/100, failures $failures, '
+        'Campaign: cleared ${d.highestStageCleared}/${StageSpec.levelCount}, '
+        'failures $failures, '
         'coins earned $totalCoins, final upgrades '
         '${d.upgrades.map((k, v) => MapEntry(k.name, v))}';
     Directory('build').createSync(recursive: true);
@@ -197,7 +198,7 @@ void main() {
     // ignore: avoid_print
     print(summary);
     expect(failures, 0, reason: 'every level must be clearable');
-  }, timeout: const Timeout(Duration(minutes: 30)));
+  }, timeout: const Timeout(Duration(hours: 2)));
 
   test('speed stays inside the caps on every level', () {
     for (final level in Campaign.levels) {

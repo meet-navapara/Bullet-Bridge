@@ -127,8 +127,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         startingPowerUps: bonus,
       ),
       skin: Catalog.skin(data.selectedSkin),
-      // Chapters 2-10 have their own environment; chapter 1, Endless and
-      // the daily challenge use the player's chosen theme.
+      // Every chapter after the first has its own environment; chapter 1,
+      // Endless and the daily challenge use the player's chosen theme.
       theme: stage != null && StageSpec.chapterOf(stage) > 1
           ? Campaign.level(stage).chapterDef.theme
           : Catalog.theme(data.selectedTheme),
@@ -272,6 +272,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _showingAd = false;
     }
     if (!mounted) return;
+    _services.analytics.rewardedAd('continue', earned: earned);
     if (earned && _game!.revive()) {
       _game!.resumeEngine();
       setState(() => _overlay = _Overlay.none);
@@ -291,7 +292,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       gamesSinceLast: services.progress.data.gamesSinceInterstitial,
       lastRunLength: DateTime.now().difference(_runStart),
     );
-    if (shown) await services.progress.markInterstitialShown();
+    if (shown) {
+      services.analytics.interstitialShown();
+      await services.progress.markInterstitialShown();
+    }
   }
 
   Future<void> _restart({int? stage}) async {
@@ -433,8 +437,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     bottom: 0,
                     child: _BottomBar(
                       hud: _hud,
-                      onElement: (e) => _game?.selectElement(e),
-                      onPowerUp: (t) => _game?.activatePowerUp(t),
+                      onElement: (e) {
+                        _services.analytics.elementSelected(e.name);
+                        _game?.selectElement(e);
+                      },
+                      onPowerUp: (t) {
+                        _services.analytics.powerUpUsed(t.name);
+                        _game?.activatePowerUp(t);
+                      },
                     ),
                   ),
                   if (_showDragHint && _overlay == _Overlay.none)
@@ -543,36 +553,51 @@ class _TopHud extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      HudChip(
-                        icon: _ScoreBadge(label: label),
-                        child: Text(
-                          formatInt(hud.score),
-                          style: TextStyles.number.copyWith(fontSize: 18),
+                  // Shrinks only when a big score, big coin count and large
+                  // system text leave it no room on a narrow phone.
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.topLeft,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            HudChip(
+                              icon: _ScoreBadge(label: label),
+                              child: Text(
+                                formatInt(hud.score),
+                                style: TextStyles.number.copyWith(fontSize: 18),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const SizedBox(width: 6),
+                                for (var i = 0; i < hud.maxHull; i++)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 2),
+                                    child: HeartIcon(
+                                      filled: i < hud.hull,
+                                      size: 22,
+                                    ),
+                                  ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  waveText,
+                                  style: TextStyles.number.copyWith(
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const SizedBox(width: 6),
-                          for (var i = 0; i < hud.maxHull; i++)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 2),
-                              child: HeartIcon(filled: i < hud.hull, size: 22),
-                            ),
-                          const SizedBox(width: 6),
-                          Text(
-                            waveText,
-                            style: TextStyles.number.copyWith(fontSize: 15),
-                          ),
-                        ],
-                      ),
-                    ],
+                    ),
                   ),
-                  const Spacer(),
                   HudChip(
                     icon: const CoinIcon(size: 32),
                     child: Text(
@@ -608,8 +633,7 @@ class _TopHud extends StatelessWidget {
                   fraction: hud.bossFraction!,
                   phase: hud.bossPhase,
                   phases: hud.bossPhases,
-                  plates: hud.bossPlates,
-                  weakOpen: hud.bossWeakOpen,
+                  ballsLeft: hud.bossBallsLeft,
                 ),
               ],
             ],
@@ -653,15 +677,13 @@ class _BossBar extends StatelessWidget {
     required this.fraction,
     required this.phase,
     required this.phases,
-    required this.plates,
-    required this.weakOpen,
+    required this.ballsLeft,
   });
   final String name;
   final double fraction;
   final int phase;
   final int phases;
-  final int plates;
-  final bool weakOpen;
+  final int ballsLeft;
 
   @override
   Widget build(BuildContext context) {
@@ -693,26 +715,18 @@ class _BossBar extends StatelessWidget {
                     border: Border.all(color: Palette.outline, width: 1.5),
                   ),
                 ),
-              if (plates > 0) ...[
+              if (ballsLeft > 0) ...[
                 const SizedBox(width: 6),
-                const Icon(
-                  Icons.shield_rounded,
-                  size: 16,
-                  color: Color(0xFFD9C7B5),
-                ),
+                const Icon(Icons.circle, size: 16, color: Palette.cyan),
                 Text(
-                  'x$plates',
+                  'x$ballsLeft',
                   style: TextStyles.number.copyWith(fontSize: 13),
                 ),
               ],
             ],
           ),
           const SizedBox(height: 3),
-          ProgressBar(
-            value: fraction,
-            color: weakOpen ? Palette.yellow : Palette.coral,
-            height: 12,
-          ),
+          ProgressBar(value: fraction, color: Palette.coral, height: 12),
         ],
       ),
     );
@@ -1088,6 +1102,15 @@ class _StageIntroState extends State<_StageIntro>
                       stageHint(widget.stage),
                       textAlign: TextAlign.center,
                       style: TextStyles.heading.copyWith(fontSize: 18),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      level.animation.label.toUpperCase(),
+                      textAlign: TextAlign.center,
+                      style: TextStyles.caption.copyWith(
+                        color: Colors.white,
+                        shadows: TextStyles.outlined,
+                      ),
                     ),
                   ],
                 ),

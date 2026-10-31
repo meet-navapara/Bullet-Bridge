@@ -1,5 +1,18 @@
+import '../config/balance.dart';
 import '../economy/catalog.dart';
 import '../economy/upgrades.dart';
+
+/// How the player chose to play on this device.
+enum AccountMode {
+  /// Has not chosen yet: the welcome screen is shown.
+  undecided,
+
+  /// No account: progress stays on this device and nothing is uploaded.
+  guest,
+
+  /// Signed in with Google: progress is kept in the cloud.
+  google,
+}
 
 /// Player settings. Persisted inside [SaveData].
 class GameSettings {
@@ -11,6 +24,7 @@ class GameSettings {
     this.sfxVolume = 0.8,
     this.reducedMotion = false,
     this.shareUsageData = true,
+    this.accountMode = AccountMode.undecided,
   });
 
   bool music;
@@ -23,6 +37,9 @@ class GameSettings {
   /// Anonymous analytics and crash reports (Firebase). Players can opt out.
   bool shareUsageData;
 
+  /// Per device, like every setting: merging saves never changes it.
+  AccountMode accountMode;
+
   Map<String, Object?> toJson() => {
     'music': music,
     'sfx': sfx,
@@ -31,6 +48,7 @@ class GameSettings {
     'sfxVolume': sfxVolume,
     'reducedMotion': reducedMotion,
     'shareUsageData': shareUsageData,
+    'accountMode': accountMode.name,
   };
 
   factory GameSettings.fromJson(Map<String, Object?> json) => GameSettings(
@@ -41,6 +59,10 @@ class GameSettings {
     sfxVolume: _unit(json['sfxVolume'], 0.8),
     reducedMotion: _bool(json['reducedMotion'], false),
     shareUsageData: _bool(json['shareUsageData'], true),
+    accountMode: AccountMode.values.firstWhere(
+      (m) => m.name == json['accountMode'],
+      orElse: () => AccountMode.undecided,
+    ),
   );
 }
 
@@ -296,7 +318,8 @@ class SaveData {
       daily: DailyState.fromJson(_map(json['daily'])),
       committedRuns: runs is List ? runs.whereType<String>().toSet() : {},
       gamesSinceInterstitial: _int(json['gamesSinceInterstitial']),
-      highestStageCleared: _int(json['highestStageCleared']).clamp(0, 999),
+      highestStageCleared: _int(json['highestStageCleared'])
+          .clamp(0, StageSpec.levelCount),
       stageStars: _stars(json['stageStars']),
       bestChain: _int(json['bestChain']),
       levelBest: _levelBest(json['levelBest']),

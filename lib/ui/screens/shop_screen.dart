@@ -73,6 +73,7 @@ class _ShopScreenState extends State<ShopScreen> {
           : await progress.buyTheme(id);
       if (!mounted) return;
       if (result == PurchaseResult.success) {
+        services.analytics.itemBought(id);
         services.audio.play(Sfx.upgrade);
         services.haptics.trigger(Haptic.medium);
         showToast(
@@ -95,6 +96,7 @@ class _ShopScreenState extends State<ShopScreen> {
   Future<void> _watchAdForCoins() async {
     final services = AppScope.of(context);
     final earned = await services.ads.showRewarded();
+    services.analytics.rewardedAd('shop', earned: earned);
     if (!mounted) return;
     if (!earned) {
       showToast(context, 'Ad closed before the reward.');

@@ -282,11 +282,16 @@ class GameSimulation {
     }
     final def = wavePlan.boss;
     if (def != null) {
+      final chapter = math.max(1, Bosses.campaign.indexOf(def) + 1);
       boss =
           Boss(
               def: def,
-              coreMax: math.max(1, scale * def.coreHpFactor).roundToDouble(),
-              plateMax: math.max(1, scale * def.plateHpFactor).roundToDouble(),
+              balls: BossSpec.ballPlan(
+                chapter,
+                _rng.nextDouble,
+                supplyScale: def.ballSupplyScale,
+              ),
+              throwInterval: BossSpec.throwIntervalFor(chapter),
               homeY: arenaHeight * BossSpec.hoverFraction,
               x: width / 2,
             )
@@ -552,13 +557,14 @@ class GameSimulation {
       for (final s in shots) {
         if (!s.dead) consider(s, s.x, s.y, s.radius);
       }
-      if (b != null && !b.dead) {
-        for (var i = 0; i < b.plates.length; i++) {
-          if (b.plates[i] > 0) {
-            consider(_PlateRef(i), b.plateX(i), b.plateY(i), b.plateRadius(i));
-          }
-        }
-        consider(b, b.x, b.y, b.coreRadius);
+      // Bullets pass through the boss, so it can never shield its own balls.
+      // A spark shows they did nothing (throttled to a few per second).
+      if (b != null &&
+          !b.dead &&
+          b.shieldFx <= 0 &&
+          _within(bullet.x, toY, b.x, b.y, b.coreRadius)) {
+        b.shieldFx = 0.12;
+        events.add(BossShielded(bullet.x, toY));
       }
 
       final hit = target;
@@ -571,7 +577,7 @@ class GameSimulation {
   void _applyBulletHit(Bullet bullet, Object hit, double hy) {
     final dmg = bullet.damage;
     final e = bullet.element;
-    var hx = bullet.x;
+    final hx = bullet.x;
     switch (hit) {
       case final Ball ball:
         damageBall(ball, dmg, hitY: hy, element: e);
@@ -581,11 +587,6 @@ class GameSimulation {
       case final EnemyShot s:
         s.dead = true;
         events.add(ShotDropped(s.x, s.y));
-      case final _PlateRef p:
-        hx = boss!.plateX(p.index);
-        _damageBoss(dmg, DamageSource.bullet, element: e, plate: p.index);
-      case Boss _:
-        _damageBoss(dmg, DamageSource.bullet, element: e);
     }
     final power = loadout.elementPower;
     switch (e) {
@@ -600,7 +601,6 @@ class GameSimulation {
           DamageSource.splash,
           exclude: hit,
           element: Element.fire,
-          includeBoss: hit is! Boss && hit is! _PlateRef,
         );
       case Element.electric:
         _arc(hx, hy, dmg * ElementSpec.arcFraction * power, exclude: hit);
@@ -641,7 +641,7 @@ class GameSimulation {
     events.add(ArcZap(points));
   }
 
-  /// Up to [count] creatures/hazards/boss nearest to (x, y) within [range].
+  /// Up to [count] creatures/hazards nearest to (x, y) within [range].
   List<(Object, double, double)> _nearestTargets(
     double x,
     double y,
@@ -664,10 +664,6 @@ class GameSimulation {
     for (final hz in hazards) {
       if (!hz.dead) add(hz, hz.x, hz.y, hz.radius);
     }
-    final b = boss;
-    if (b != null && !b.dead && exclude is! Boss && exclude is! _PlateRef) {
-      add(b, b.x, b.y, b.coreRadius);
-    }
     found.sort((a, b) => a.$4.compareTo(b.$4));
     return [for (final f in found.take(count)) (f.$1, f.$2, f.$3)];
   }
@@ -684,12 +680,10 @@ class GameSimulation {
         damageBall(ball, damage, source: source, element: element);
       case final Hazard hz:
         _damageHazard(hz, damage, depth);
-      case Boss _:
-        _damageBoss(damage, source, element: element);
     }
   }
 
-  /// Damages everything in a circle (creatures, hazards, optionally boss).
+  /// Damages everything in a circle (creatures and hazards).
   void _areaDamage(
     double x,
     double y,
@@ -699,7 +693,6 @@ class GameSimulation {
     Object? exclude,
     Element element = Element.kinetic,
     int depth = 0,
-    bool includeBoss = true,
   }) {
     for (final ball in List<Ball>.of(balls)) {
       if (ball.dead || identical(ball, exclude)) continue;
@@ -711,24 +704,6 @@ class GameSimulation {
       if (hz.dead || identical(hz, exclude)) continue;
       if (_within(hz.x, hz.y, x, y, radius + hz.radius)) {
         _damageHazard(hz, damage, depth);
-      }
-    }
-    final b = boss;
-    if (includeBoss && b != null && !b.dead) {
-      for (var i = 0; i < b.plates.length; i++) {
-        if (b.plates[i] > 0 &&
-            _within(
-              b.plateX(i),
-              b.plateY(i),
-              x,
-              y,
-              radius + b.plateRadius(i),
-            )) {
-          _damageBoss(damage, source, element: element, plate: i);
-        }
-      }
-      if (_within(b.x, b.y, x, y, radius + b.coreRadius)) {
-        _damageBoss(damage, source, element: element);
       }
     }
   }
@@ -830,6 +805,7 @@ class GameSimulation {
     events.add(
       BallDestroyed(ball.x, ball.y, ball.tier, split: split, kind: ball.kind),
     );
+    _bossLosesBall();
   }
 
   void _split(Ball parent, {double? pushFromX}) {
@@ -1200,7 +1176,16 @@ class GameSimulation {
     if (b == null || b.dead) return;
     if (b.hitFlash > 0) b.hitFlash = math.max(0, b.hitFlash - h);
     if (b.shieldFx > 0) b.shieldFx = math.max(0, b.shieldFx - h);
+    if (b.throwRecoil > 0) b.throwRecoil = math.max(0, b.throwRecoil - h);
     final t = h * ballTimeScale;
+
+    // The last ball is gone: the boss goes down with its supply.
+    if (b.ballQueue.isEmpty &&
+        _newBalls.isEmpty &&
+        balls.every((ball) => ball.dead)) {
+      _defeatBoss(b);
+      return;
+    }
 
     // Movement (unless slamming). During the entrance the boss glides down
     // from above the arena to its hover height.
@@ -1225,7 +1210,8 @@ class GameSimulation {
       return;
     }
 
-    _updateWeakPoint(b, t);
+    // It keeps throwing whatever else it is doing, a slam included.
+    _updateThrowing(b, t);
     if (b.slam != SlamState.none) {
       _updateSlam(b, t);
       return;
@@ -1246,6 +1232,106 @@ class GameSimulation {
         b.timers[a] = 1.0;
       }
       break;
+    }
+  }
+
+  void _updateThrowing(Boss b, double t) {
+    if (b.ballQueue.isEmpty) return;
+    b.throwTimer -= t;
+    if (b.throwTimer > 0) return;
+    // A full arena just delays the throw: the supply never shrinks by itself.
+    if (balls.length + _newBalls.length >= BossSpec.maxThrownAlive) {
+      b.throwTimer = 0;
+      return;
+    }
+    _throwBall(b, b.x);
+    b.throwTimer = b.currentThrowInterval * _rng.range(0.85, 1.15);
+  }
+
+  /// Throws the next ball of the boss's supply from above [fromX].
+  void _throwBall(Boss b, double fromX) {
+    final tier = b.ballQueue.removeAt(0);
+    final r = BallSpec.radius[tier];
+    final hp = math.max(1, (scale * WaveSpec.tierHpFactor[tier]).round());
+    // Armour needs a shell-sized body.
+    final geode = b.def.minionKind == EnemyKind.geode && tier >= 2;
+    final affinity = b.def.minionAffinity
+        ? const [Element.fire, Element.ice, Element.electric][_rng.nextInt(3)]
+        : null;
+    // Mostly at the cannon, so standing still is never safe.
+    final towards = (cannonX - fromX) >= 0 ? 1.0 : -1.0;
+    final dir = _rng.nextDouble() < BossSpec.throwAtCannonChance
+        ? towards
+        : -towards;
+    final y = b.y + b.coreRadius;
+    _newBalls.add(
+      Ball(
+        id: _nextId++,
+        tier: tier,
+        maxHp: hp,
+        x: fromX.clamp(r, width - r),
+        y: y,
+        vx: dir * _speedFor(tier),
+        vy: BossSpec.throwVelocity,
+        kind: geode ? EnemyKind.geode : EnemyKind.shard,
+        armor: geode ? (hp * EnemySpec.geodeArmorFraction).roundToDouble() : 0,
+        affinity: affinity,
+      ),
+    );
+    b.throwRecoil = BossSpec.throwRecoilTime;
+    events.add(BossThrew(fromX, y));
+  }
+
+  /// A ball of the boss's supply, or a piece of one, was destroyed.
+  void _bossLosesBall() {
+    final b = boss;
+    if (b == null || b.dead) return;
+    b.unitsLeft = math.max(0, b.unitsLeft - 1);
+    b.hitFlash = BallSpec.hitFlashTime;
+    events.add(BossHit(b.x, b.y + b.coreRadius * 0.6, plate: false));
+
+    // Armour falls off evenly as health drops.
+    final lost = 1 - b.coreFraction;
+    for (var i = 0; i < b.plates.length; i++) {
+      if (b.plates[i] > 0 && lost >= (i + 1) / (b.plates.length + 1)) {
+        b.plates[i] = 0;
+        events.add(BossPlateBroken(b.plateX(i), b.plateY(i)));
+        for (var c = 0; c < 4; c++) {
+          _spawnCoin(b.plateX(i), b.plateY(i), 1);
+        }
+      }
+    }
+
+    if (b.targetPhase > b.phase && b.unitsLeft > 0) _nextBossPhase(b);
+  }
+
+  void _nextBossPhase(Boss b) {
+    final next = b.phase + 1;
+    b.phase = next;
+    b.transition = BossSpec.phaseTransition;
+    if (b.slam != SlamState.none) b.slam = SlamState.rising;
+    // An interrupted slam must not hurt the player on its way back up.
+    b.slamHit = true;
+    b.armPhase();
+    telegraphs.removeWhere((t) => t.slam);
+    events.add(BossPhaseChanged(next));
+    // Fresh volatile crystals beside the boss reward chain-reaction play.
+    final kinds = switch (plan) {
+      final StagePlan p => p.level.hazardKinds,
+      _ => const [HazardKind.blaze],
+    };
+    if (kinds.isNotEmpty && hazards.where((h) => !h.dead).length < 2) {
+      for (final (k, xf) in [(0, 0.22), (1, 0.78)]) {
+        hazards.add(
+          Hazard(
+            id: _nextId++,
+            kind: kinds[(k + next) % kinds.length],
+            x: xf * width,
+            y: b.homeY + b.coreRadius + 35,
+            maxHp: _hazardHp,
+          ),
+        );
+      }
     }
   }
 
@@ -1291,34 +1377,13 @@ class GameSimulation {
           ),
         );
       case BossAttack.minions:
-        if (balls.length >= BossSpec.maxMinions) return false;
-        // Small, non-splitting shards (geode minions need a shell-sized
-        // body), so minions add pressure without flooding the arena.
-        final geode = b.def.minionKind == EnemyKind.geode;
-        final tier = geode ? 2 : 0;
-        final hp = math.max(1, (scale * WaveSpec.tierHpFactor[tier]).round());
-        for (final dir in const [-1, 1]) {
-          final affinity = b.def.minionAffinity
-              ? const [Element.fire, Element.ice, Element.electric][_rng
-                    .nextInt(3)]
-              : null;
-          _newBalls.add(
-            Ball(
-              id: _nextId++,
-              tier: tier,
-              maxHp: hp,
-              x: (b.x + dir * 30).clamp(20, width - 20),
-              y: b.y + b.coreRadius,
-              vx: dir * _speedFor(tier),
-              vy: -150,
-              kind: geode ? EnemyKind.geode : EnemyKind.shard,
-              armor: geode
-                  ? (hp * EnemySpec.geodeArmorFraction).roundToDouble()
-                  : 0,
-              affinity: affinity,
-            ),
-          );
+        // A burst: two balls of its supply at once, from either side.
+        if (b.ballQueue.length < 2 ||
+            balls.length + _newBalls.length + 2 > BossSpec.maxThrownAlive) {
+          return false;
         }
+        _throwBall(b, b.x - 30);
+        _throwBall(b, b.x + 30);
       case BossAttack.fan:
         // Five shards fanned out (three per head for heads that fire).
         final sources = <(double, double)>[
@@ -1440,25 +1505,6 @@ class GameSimulation {
     return xs;
   }
 
-  void _updateWeakPoint(Boss b, double t) {
-    if (!b.hasWeakWindows) return;
-    b.weakTimer -= t;
-    if (b.weakTimer > 0) return;
-    switch (b.weak) {
-      case WeakState.closed:
-        b.weak = WeakState.warning;
-        b.weakTimer = BossSpec.weakWarning;
-      case WeakState.warning:
-        b.weak = WeakState.open;
-        b.weakTimer = BossSpec.weakOpen;
-        events.add(WeakPointChanged(b.x, b.y, open: true));
-      case WeakState.open:
-        b.weak = WeakState.closed;
-        b.weakTimer = BossSpec.weakClosed * (b.phase >= 2 ? 0.85 : 1);
-        events.add(WeakPointChanged(b.x, b.y, open: false));
-    }
-  }
-
   void _updateSlam(Boss b, double t) {
     switch (b.slam) {
       case SlamState.none:
@@ -1497,116 +1543,8 @@ class GameSimulation {
     }
   }
 
-  void _damageBoss(
-    double amount,
-    DamageSource source, {
-    Element element = Element.kinetic,
-    int? plate,
-  }) {
-    final b = boss;
-    if (b == null || b.dead || amount <= 0) return;
-    if (b.transition > 0) {
-      // Entrances and phase changes are invulnerable; show it, so shots
-      // never seem to vanish (throttled to a few sparks per second).
-      if (source == DamageSource.bullet && b.shieldFx <= 0) {
-        b.shieldFx = 0.12;
-        events.add(
-          BossShielded(
-            plate == null ? b.x : b.plateX(plate),
-            plate == null ? b.y + b.coreRadius * 0.8 : b.plateY(plate),
-          ),
-        );
-      }
-      return;
-    }
-    final explosive =
-        source == DamageSource.blast ||
-        source == DamageSource.splash ||
-        source == DamageSource.bomb;
-    b.hitFlash = BallSpec.hitFlashTime;
-    if (plate != null) {
-      if (b.plates[plate] <= 0) return;
-      final weakness = b.def.plates[plate].weakness;
-      final double mult;
-      if (weakness != null) {
-        // Heads: only their element really hurts them.
-        mult = element == weakness
-            ? BossSpec.headWeakMultiplier
-            : BossSpec.headOtherMultiplier;
-      } else {
-        mult = element == Element.fire || explosive
-            ? ElementSpec.fireVsArmor
-            : 1;
-      }
-      final dmg = amount * mult;
-      final dealt = math.min(dmg, b.plates[plate]);
-      b.plates[plate] -= dmg;
-      _addScore(dealt);
-      if (source == DamageSource.bullet) {
-        events.add(BossHit(b.plateX(plate), b.plateY(plate), plate: true));
-      }
-      if (b.plates[plate] <= 0) {
-        b.plates[plate] = 0;
-        events.add(BossPlateBroken(b.plateX(plate), b.plateY(plate)));
-        for (var i = 0; i < 4; i++) {
-          _spawnCoin(b.plateX(plate), b.plateY(plate), 1);
-        }
-      }
-      return;
-    }
-    final dmg = amount * b.exposure;
-    final dealt = math.min(dmg, b.core);
-    b.core -= dmg;
-    _addScore(dealt);
-    if (source == DamageSource.bullet) {
-      events.add(BossHit(b.x, b.y + b.coreRadius * 0.6, plate: false));
-    }
-    if (b.core <= 0) {
-      _defeatBoss(b);
-      return;
-    }
-    final next = b.targetPhase;
-    if (next > b.phase) {
-      b.phase = next;
-      b.transition = BossSpec.phaseTransition;
-      if (b.slam != SlamState.none) b.slam = SlamState.rising;
-      // An interrupted slam must not hurt the player on its way back up.
-      b.slamHit = true;
-      b.weak = WeakState.closed;
-      b.weakTimer = BossSpec.weakClosed * 0.5;
-      b.armPhase();
-      telegraphs.removeWhere((t) => t.slam);
-      events.add(BossPhaseChanged(next));
-      if (b.def.regrowHeads) {
-        final i = b.plates.indexWhere((p) => p <= 0);
-        if (i >= 0) {
-          b.plates[i] = (b.plateMax * 0.6).roundToDouble();
-          events.add(BossHeadRegrown(b.plateX(i), b.plateY(i)));
-        }
-      }
-      // Fresh volatile crystals beside the boss reward chain-reaction play.
-      final kinds = switch (plan) {
-        final StagePlan p => p.level.hazardKinds,
-        _ => const [HazardKind.blaze],
-      };
-      if (kinds.isNotEmpty && hazards.where((h) => !h.dead).length < 2) {
-        for (final (k, xf) in [(0, 0.22), (1, 0.78)]) {
-          hazards.add(
-            Hazard(
-              id: _nextId++,
-              kind: kinds[(k + next) % kinds.length],
-              x: xf * width,
-              y: b.homeY + b.coreRadius + 35,
-              maxHp: _hazardHp,
-            ),
-          );
-        }
-      }
-    }
-  }
-
   void _defeatBoss(Boss b) {
-    b.core = 0;
+    b.unitsLeft = 0;
     b.dead = true;
     bossDefeated = true;
     score += 2000;
@@ -1828,12 +1766,6 @@ class GameSimulation {
         _damageHazard(hz, hz.hp, 0);
       }
     }
-    final b = boss;
-    if (b != null &&
-        !b.dead &&
-        _within(b.x, b.y, cx, cy, radius + b.coreRadius)) {
-      _damageBoss(b.coreMax * 0.05, DamageSource.bomb);
-    }
     shots.clear();
   }
 
@@ -1864,10 +1796,4 @@ class GameSimulation {
     _accumulator = 0;
     return true;
   }
-}
-
-/// Bullet target marker for one of the boss's armour plates.
-class _PlateRef {
-  const _PlateRef(this.index);
-  final int index;
 }

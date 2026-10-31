@@ -55,3 +55,9 @@ app.*.map.json
 *.env
 .env*
 /secrets/
+/release.json
+
+# Generated
+/.firebase/
+/android/build/
+/tool/screenshots/failures/

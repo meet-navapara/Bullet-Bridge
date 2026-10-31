@@ -14,22 +14,6 @@ import 'tutorial_screen.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
-  Future<void> _openLegal(BuildContext context, LegalDoc doc) async {
-    final url = doc == LegalDoc.privacy
-        ? AppConfig.privacyPolicyUrl
-        : AppConfig.termsUrl;
-    if (url.isNotEmpty) {
-      final ok = await launchUrl(
-        Uri.parse(url),
-        mode: LaunchMode.externalApplication,
-      ).catchError((_) => false);
-      if (ok) return;
-    }
-    if (context.mounted) {
-      Navigator.of(context).push(gameRoute<void>(LegalScreen(doc: doc)));
-    }
-  }
-
   Future<void> _reset(BuildContext context) async {
     final progress = AppScope.of(context).progress;
     final ok = await confirmDialog(
@@ -83,6 +67,8 @@ class SettingsScreen extends StatelessWidget {
               Gaps.xl,
             ),
             children: [
+              const CloudSavePanel(),
+              const SizedBox(height: Gaps.lg),
               GamePanel(
                 padding: const EdgeInsets.symmetric(
                   horizontal: Gaps.lg,
@@ -127,15 +113,13 @@ class SettingsScreen extends StatelessWidget {
                     ),
                     _SwitchRow(
                       label: 'Share Usage Data',
-                      subtitle: 'Anonymous stats and crash reports',
+                      subtitle: 'How the game is used, and crash reports',
                       value: s.shareUsageData,
                       onChanged: (v) => update((x) => x.shareUsageData = v),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: Gaps.lg),
-              const CloudSavePanel(),
               const SizedBox(height: Gaps.lg),
               GamePanel(
                 padding: const EdgeInsets.symmetric(
@@ -165,11 +149,11 @@ class SettingsScreen extends StatelessWidget {
                     ),
                     _LinkRow(
                       label: 'Privacy Policy',
-                      onTap: () => _openLegal(context, LegalDoc.privacy),
+                      onTap: () => LegalScreen.open(context, LegalDoc.privacy),
                     ),
                     _LinkRow(
                       label: 'Terms of Service',
-                      onTap: () => _openLegal(context, LegalDoc.terms),
+                      onTap: () => LegalScreen.open(context, LegalDoc.terms),
                     ),
                     _LinkRow(
                       label: 'Delete Account & Data',

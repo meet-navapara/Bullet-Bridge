@@ -11,7 +11,7 @@ import 'package:orbit_blast/game/sim/seeded_random.dart';
 import 'package:orbit_blast/game/sim/wave_director.dart';
 
 import '../support/auto_player.dart';
-import 'mechanics_test.dart' show arena, quiet, shoot, steps;
+import 'mechanics_test.dart' show arena, quiet, steps;
 
 /// A run that is only [def]'s boss wave.
 class BossOnlyPlan implements RunPlan {
@@ -44,18 +44,21 @@ GameSimulation bossSim(BossDef def) {
     ..transition = 0
     ..y = sim.boss!.homeY;
   b.timers.updateAll((_, _) => 999);
+  b.throwTimer = 999;
   return sim;
 }
 
-void hitCore(GameSimulation sim, double damage, {Element? element}) {
+/// Destroys one ball of the boss's supply, as a player would.
+void smashOne(GameSimulation sim) {
   final b = sim.boss!;
-  shoot(
-    sim,
-    b.x,
-    b.y + b.coreRadius + 2,
-    damage: damage,
-    element: element ?? Element.kinetic,
-  );
+  if (sim.balls.where((x) => !x.dead).isEmpty && b.ballQueue.isNotEmpty) {
+    b.throwTimer = 0;
+    sim.step(Physics.fixedStep);
+  }
+  final ball = sim.balls.firstWhere((x) => !x.dead);
+  ball.armor = 0;
+  sim.damageBall(ball, ball.hp);
+  sim.step(Physics.fixedStep);
 }
 
 void main() {
@@ -69,10 +72,26 @@ void main() {
       }
     });
 
+    test('every chapter has its own boss, built on an original', () {
+      expect(Bosses.campaign, hasLength(100));
+      expect(Bosses.campaign.map((b) => b.name).toSet(), hasLength(100));
+      for (var c = 11; c <= 100; c++) {
+        final boss = Bosses.forChapter(c);
+        final original = Bosses.all[(c - 1) % 10];
+        expect(boss.shape, original.shape);
+        expect(boss.reward.skinId, isNull, reason: 'skins come from originals');
+        for (var p = 0; p < boss.phases.length; p++) {
+          expect(
+            boss.phases[p].attacks,
+            containsAll(original.phases[p].attacks),
+          );
+          expect(boss.phases[p].attacks.length, lessThanOrEqualTo(4));
+        }
+      }
+    });
+
     test('every boss definition is consistent and fits the arena', () {
-      for (final b in Bosses.all) {
-        expect(b.exposure, hasLength(b.plates.length + 1), reason: b.name);
-        expect(b.exposure.last, 1.0, reason: b.name);
+      for (final b in Bosses.campaign) {
         expect(b.phases.length, inInclusiveRange(2, 4), reason: b.name);
         for (final p in b.phases) {
           expect(p.attacks, isNotEmpty, reason: b.name);
@@ -82,47 +101,6 @@ void main() {
         expect(b.reward.coins, greaterThan(0));
         if (b.reward.skinId != null) {
           expect(Catalog.isSkin(b.reward.skinId!), isTrue);
-        }
-      }
-    });
-
-    test('every plate and head can be hit from below', () {
-      for (final def in Bosses.all) {
-        for (var i = 0; i < def.plates.length; i++) {
-          final p = def.plates[i];
-          // Some bullet column must reach this plate before anything else.
-          var reachable = false;
-          for (var dx = p.dx - p.radius + 1; dx < p.dx + p.radius; dx += 1) {
-            final hitsPlate = (dx - p.dx).abs() < p.radius;
-            // Lowest leading edge (largest y) is hit first.
-            double bottom(double cx, double cy, double r) {
-              final d = (dx - cx).abs();
-              return d >= r ? double.negativeInfinity : cy + r;
-            }
-
-            final mine = bottom(p.dx, p.dy, p.radius);
-            var blocked = bottom(0, 0, def.coreRadius) > mine;
-            for (var j = 0; j < def.plates.length; j++) {
-              if (j == i) continue;
-              final o = def.plates[j];
-              if (bottom(o.dx, o.dy, o.radius) > mine) blocked = true;
-            }
-            if (hitsPlate && !blocked) reachable = true;
-          }
-          // Plates hidden behind other plates are fine: those break first.
-          final behindPlate = [
-            for (var j = 0; j < def.plates.length; j++)
-              if (j != i &&
-                  (def.plates[j].dx - p.dx).abs() <
-                      def.plates[j].radius + p.radius &&
-                  def.plates[j].dy > p.dy)
-                j,
-          ].isNotEmpty;
-          expect(
-            reachable || behindPlate,
-            isTrue,
-            reason: '${def.name} plate $i is shielded by the core',
-          );
         }
       }
     });
@@ -138,10 +116,10 @@ void main() {
     });
   });
 
-  group('boss engine', () {
+  group('boss balls', () {
     final colossus = Bosses.of(BossId.crystalColossus);
 
-    test('entrance: starts above the arena, invulnerable, then descends', () {
+    test('entrance: starts above the arena, then descends and throws', () {
       final sim = GameSimulation(
         loadout: quiet,
         seed: 1,
@@ -151,96 +129,214 @@ void main() {
       final b = sim.boss!;
       expect(b.y, lessThan(0));
       expect(b.transition, BossSpec.entranceTime);
-      final core = b.core;
-      steps(sim, 0.5);
-      sim.bullets.add(Bullet(b.x, b.y + b.coreRadius + 2, 50));
-      sim.step(Physics.fixedStep);
-      expect(b.core, core, reason: 'invulnerable during the entrance');
-      steps(sim, BossSpec.entranceTime + 2);
+      steps(sim, BossSpec.entranceTime - 0.1);
+      expect(sim.balls, isEmpty, reason: 'no throwing during the entrance');
+      steps(sim, 2);
       expect(b.y, closeTo(b.homeY, 2));
+      expect(sim.events.whereType<BossThrew>(), isNotEmpty);
     });
 
-    test('plates shield the core until broken', () {
+    test('it keeps throwing until its supply is gone', () {
+      final sim = bossSim(colossus);
+      final b = sim.boss!..throwTimer = 0;
+      final supply = b.ballQueue.length;
+      expect(supply, greaterThan(5));
+      var thrown = 0;
+      for (var i = 0; i < 120 * 300 && b.ballQueue.isNotEmpty; i++) {
+        sim.invulnerableTimer = 1;
+        sim.step(Physics.fixedStep);
+        thrown += sim.drainEvents().whereType<BossThrew>().length;
+        // Keep room in the arena, so nothing but the supply limits it.
+        for (final ball in List<Ball>.of(sim.balls)) {
+          ball.armor = 0;
+          sim.damageBall(ball, ball.hp);
+        }
+      }
+      expect(thrown, supply);
+    });
+
+    test('throws wait while the arena is full', () {
       final sim = bossSim(colossus);
       final b = sim.boss!;
-      hitCore(sim, 100);
-      expect(b.core, closeTo(b.coreMax - 100 * colossus.exposure[0], 1e-6));
-      for (var i = 0; i < b.plates.length; i++) {
-        sim.bullets.add(
-          Bullet(
-            b.plateX(i),
-            b.plateY(i) + b.plateRadius(i) + 2,
-            b.plateMax,
-            element: Element.fire,
+      for (var i = 0; i < BossSpec.maxThrownAlive; i++) {
+        sim.balls.add(
+          Ball(
+            id: 900 + i,
+            tier: 0,
+            maxHp: 9,
+            x: 60.0 + i,
+            y: 300,
+            vx: 0,
+            vy: 0,
           ),
         );
-        sim.step(Physics.fixedStep);
       }
-      expect(b.platesLeft, 0);
-      expect(sim.events.whereType<BossPlateBroken>(), hasLength(2));
-      final before = b.core;
-      hitCore(sim, 10);
-      expect(b.core, closeTo(before - 10, 1e-6));
+      final left = b.ballQueue.length;
+      b.throwTimer = 0;
+      sim.invulnerableTimer = 100;
+      steps(sim, 1);
+      expect(b.ballQueue.length, left, reason: 'none lost while waiting');
     });
 
-    test('every boss walks through all its phases in order', () {
-      for (final def in Bosses.all) {
+    test('bullets pass through the boss and do not hurt it', () {
+      final sim = bossSim(colossus);
+      final b = sim.boss!;
+      final health = b.unitsLeft;
+      final bullet = Bullet(b.x, b.y + b.coreRadius + 2, 9999);
+      sim.bullets.add(bullet);
+      sim.step(Physics.fixedStep);
+      expect(b.unitsLeft, health);
+      expect(bullet.dead, isFalse, reason: 'it flies on');
+      expect(sim.events.whereType<BossShielded>(), hasLength(1));
+    });
+
+    test('a bomb on the boss does not hurt it, only its balls count', () {
+      final sim = bossSim(colossus);
+      final b = sim.boss!;
+      final health = b.unitsLeft;
+      sim.inventory[PowerUpType.bomb] = 1;
+      sim.activatePowerUp(PowerUpType.bomb);
+      sim.step(Physics.fixedStep);
+      expect(b.unitsLeft, health);
+    });
+
+    test('every piece destroyed takes health; split pieces count too', () {
+      expect(Boss.piecesOf(0), 1);
+      expect(Boss.piecesOf(1), 3);
+      expect(Boss.piecesOf(3), 15);
+      final sim = bossSim(colossus);
+      final b = sim.boss!;
+      expect(
+        b.unitsTotal,
+        b.ballQueue.fold<int>(0, (sum, t) => sum + Boss.piecesOf(t)),
+      );
+      var health = b.unitsLeft;
+      for (var i = 0; i < 5; i++) {
+        smashOne(sim);
+        expect(b.unitsLeft, health - 1);
+        health = b.unitsLeft;
+      }
+      expect(b.coreFraction, closeTo(health / b.unitsTotal, 1e-9));
+    });
+
+    test('every boss goes down exactly when its last ball is gone', () {
+      for (final def in Bosses.campaign) {
         final sim = bossSim(def);
         final b = sim.boss!;
-        b.plates.fillRange(0, b.plates.length, 0);
-        b.weak = WeakState.open;
         final seen = <int>[1];
         var guard = 0;
-        while (!b.dead && guard++ < 400) {
-          b.transition = 0;
-          b.y = b.homeY;
-          b.slam = SlamState.none;
-          if (b.hasWeakWindows) b.weak = WeakState.open;
-          hitCore(sim, b.coreMax * 0.05);
+        while (!b.dead && guard++ < 5000) {
+          sim.invulnerableTimer = 100;
+          b
+            ..transition = 0
+            ..y = b.homeY
+            ..slam = SlamState.none;
+          b.timers.updateAll((_, _) => 999);
+          expect(b.dead, isFalse);
+          final live = sim.balls.where((x) => !x.dead);
+          if (live.isEmpty && b.ballQueue.isEmpty) {
+            sim.step(Physics.fixedStep);
+            continue;
+          }
+          smashOne(sim);
           if (b.phase != seen.last) seen.add(b.phase);
         }
         expect(b.dead, isTrue, reason: def.name);
+        expect(b.unitsLeft, 0, reason: def.name);
+        expect(b.ballQueue, isEmpty, reason: def.name);
+        expect(sim.bossDefeated, isTrue, reason: def.name);
         expect(seen, [
           for (var p = 1; p <= def.phases.length; p++) p,
         ], reason: def.name);
-        expect(
-          sim.events.whereType<BossPhaseChanged>(),
-          hasLength(def.phases.length - 1),
-          reason: def.name,
-        );
       }
     });
 
-    test('a phase change is an invulnerable transition', () {
-      final sim = bossSim(colossus);
+    test('armour falls off as health drops', () {
+      final sim = bossSim(Bosses.of(BossId.ironBehemoth));
       final b = sim.boss!;
-      b.plates.fillRange(0, 2, 0);
-      b.core = b.coreMax * 0.67;
-      hitCore(sim, b.coreMax * 0.02);
-      expect(b.phase, 2);
-      expect(b.transition, greaterThan(0));
-      final core = b.core;
-      hitCore(sim, 50);
-      expect(b.core, core);
+      expect(b.platesLeft, 4);
+      var last = b.platesLeft;
+      while (b.unitsLeft > 1) {
+        b.transition = 0;
+        b.y = b.homeY;
+        sim.invulnerableTimer = 100;
+        b.timers.updateAll((_, _) => 999);
+        smashOne(sim);
+        expect(b.platesLeft, lessThanOrEqualTo(last));
+        last = b.platesLeft;
+      }
+      expect(b.platesLeft, 0);
+      expect(sim.events.whereType<BossPlateBroken>(), hasLength(4));
     });
+
+    test('each phase throws faster, and harder chapters throw more', () {
+      final b = bossSim(colossus).boss!;
+      final first = b.currentThrowInterval;
+      b.phase = 2;
+      expect(b.currentThrowInterval, lessThan(first));
+      expect(
+        BossSpec.throwIntervalFor(10),
+        lessThan(BossSpec.throwIntervalFor(1)),
+      );
+      for (var c = 2; c <= StageSpec.chapters; c++) {
+        expect(
+          BossSpec.ballCountFor(c),
+          greaterThanOrEqualTo(BossSpec.ballCountFor(c - 1)),
+        );
+        expect(BossSpec.ballCountFor(c), lessThanOrEqualTo(BossSpec.ballsMax));
+      }
+    });
+
+    test('a supply is the same size for any seed and starts small', () {
+      var calls = 0;
+      double random() => (calls++ * 0.37) % 1;
+      for (final chapter in [1, 5, 10, 50, 100]) {
+        final plan = BossSpec.ballPlan(chapter, random);
+        expect(plan, hasLength(BossSpec.ballCountFor(chapter)));
+        final top = BossSpec.maxThrownTierFor(chapter);
+        expect(plan.every((t) => t >= 0 && t <= top), isTrue);
+        final half = plan.length ~/ 2;
+        final early = plan.take(half).reduce((a, b) => a + b);
+        final late = plan.skip(half).reduce((a, b) => a + b);
+        expect(late, greaterThan(early), reason: 'chapter $chapter');
+      }
+    });
+
+    test('defeating the boss clears the stage and every attack', () {
+      final sim = bossSim(colossus);
+      final b = sim.boss!..ballQueue.clear();
+      sim.zones.add(
+        FloorZone(
+          kind: ZoneKind.lava,
+          x: 100,
+          halfWidth: 40,
+          warning: 1,
+          active: 3,
+        ),
+      );
+      sim.step(Physics.fixedStep);
+      expect(b.dead, isTrue);
+      expect(sim.bossDefeated, isTrue);
+      expect(sim.zones, isEmpty);
+      expect(sim.events.whereType<BossDefeated>(), hasLength(1));
+      steps(sim, 0.1);
+      expect(sim.isStageCleared, isTrue);
+    });
+  });
+
+  group('boss engine', () {
+    final colossus = Bosses.of(BossId.crystalColossus);
 
     test('shard rain is telegraphed before it falls', () {
       final sim = bossSim(colossus);
       sim.boss!.timers[BossAttack.rain] = 0.001;
       sim.step(Physics.fixedStep);
-      expect(sim.telegraphs, hasLength(3));
+      final columns = sim.telegraphs.length;
+      expect(columns, inInclusiveRange(2, 3));
       expect(sim.shots, isEmpty);
       steps(sim, BossSpec.rainTelegraph + 0.02);
-      expect(sim.shots, hasLength(3));
-    });
-
-    test('shots at an invulnerable boss show a shield spark', () {
-      final sim = bossSim(colossus);
-      final b = sim.boss!..transition = 1;
-      final core = b.core;
-      hitCore(sim, 50);
-      expect(b.core, core);
-      expect(sim.events.whereType<BossShielded>(), hasLength(1));
+      // The cannon keeps firing, and can shoot down the column aimed at it.
+      expect(sim.shots.length, inInclusiveRange(columns - 1, columns));
     });
 
     test('rain columns always leave a safe band for the cannon', () {
@@ -296,7 +392,7 @@ void main() {
     });
 
     test('attacks never start closer together than the attack gap', () {
-      for (final def in Bosses.all) {
+      for (final def in Bosses.campaign) {
         final sim = bossSim(def);
         final b = sim.boss!
           ..phase = def.phases.length
@@ -327,29 +423,6 @@ void main() {
         }
         expect(starts.length, greaterThan(3), reason: def.name);
       }
-    });
-
-    test('defeating the boss clears the stage and every attack', () {
-      final sim = bossSim(colossus);
-      final b = sim.boss!;
-      b.plates.fillRange(0, 2, 0);
-      b.core = 5;
-      sim.zones.add(
-        FloorZone(
-          kind: ZoneKind.lava,
-          x: 100,
-          halfWidth: 40,
-          warning: 1,
-          active: 3,
-        ),
-      );
-      hitCore(sim, 10);
-      expect(b.dead, isTrue);
-      expect(sim.bossDefeated, isTrue);
-      expect(sim.zones, isEmpty);
-      expect(sim.events.whereType<BossDefeated>(), hasLength(1));
-      steps(sim, 0.1);
-      expect(sim.isStageCleared, isTrue);
     });
   });
 
@@ -471,106 +544,6 @@ void main() {
       expect(sim.events.whereType<BossPulled>(), hasLength(1));
       expect(left.vx, closeTo(70, 1e-9));
       expect(right.vx, closeTo(-50, 1e-9));
-    });
-
-    test('the void rift: tiny damage while shut, big while open', () {
-      final sim = bossSim(Bosses.of(BossId.voidDevourer));
-      final b = sim.boss!;
-      expect(b.hasWeakWindows, isTrue);
-      b.weak = WeakState.closed;
-      var before = b.core;
-      hitCore(sim, 100);
-      expect(before - b.core, closeTo(100 * BossSpec.weakClosedExposure, 1e-6));
-      b.weak = WeakState.open;
-      before = b.core;
-      hitCore(sim, 100);
-      expect(before - b.core, closeTo(100 * BossSpec.weakOpenExposure, 1e-6));
-    });
-
-    test('the rift cycles: warning, open, closed', () {
-      final sim = bossSim(Bosses.of(BossId.voidDevourer));
-      final b = sim.boss!..weakTimer = 0.001;
-      sim.step(Physics.fixedStep);
-      expect(b.weak, WeakState.warning);
-      steps(sim, BossSpec.weakWarning / sim.ballTimeScale + 0.05);
-      expect(b.weak, WeakState.open);
-      expect(
-        sim.events.whereType<WeakPointChanged>().where((e) => e.open),
-        hasLength(1),
-      );
-      steps(sim, BossSpec.weakOpen / sim.ballTimeScale + 0.05);
-      expect(b.weak, WeakState.closed);
-    });
-
-    test('hydra heads: their element hurts double, others half', () {
-      final def = Bosses.of(BossId.prismHydra);
-      final sim = GameSimulation(
-        loadout: quiet,
-        seed: 3,
-        arenaHeight: arena,
-        plan: BossOnlyPlan(def),
-      );
-      final b = sim.boss!
-        ..transition = 0
-        ..y = sim.boss!.homeY;
-      b.timers.updateAll((_, _) => 999);
-      for (var i = 0; i < def.plates.length; i++) {
-        final weak = def.plates[i].weakness!;
-        final other = weak == Element.fire ? Element.ice : Element.fire;
-        var before = b.plates[i];
-        sim.bullets.add(
-          Bullet(
-            b.plateX(i),
-            b.plateY(i) + b.plateRadius(i) + 2,
-            10,
-            element: weak,
-          ),
-        );
-        sim.step(Physics.fixedStep);
-        expect(before - b.plates[i], closeTo(20, 1e-6), reason: '$weak');
-        before = b.plates[i];
-        sim.bullets.add(
-          Bullet(
-            b.plateX(i),
-            b.plateY(i) + b.plateRadius(i) + 2,
-            10,
-            element: other,
-          ),
-        );
-        sim.step(Physics.fixedStep);
-        // Fire's splash may add a little; the direct hit is halved.
-        expect(before - b.plates[i], greaterThanOrEqualTo(5 - 1e-6));
-        expect(before - b.plates[i], lessThan(10));
-      }
-    });
-
-    test('a broken hydra head grows back when the next phase starts', () {
-      final sim = bossSim(Bosses.of(BossId.prismHydra));
-      final b = sim.boss!;
-      b.plates[0] = 0;
-      b.plates[1] = 0;
-      b.plates[2] = 0;
-      b.core = b.coreMax * 0.52;
-      hitCore(sim, b.coreMax * 0.05);
-      expect(b.phase, 2);
-      expect(b.platesLeft, 1);
-      expect(sim.events.whereType<BossHeadRegrown>(), hasLength(1));
-    });
-
-    test('the iron behemoth opens up one armour section at a time', () {
-      final def = Bosses.of(BossId.ironBehemoth);
-      expect(def.plates, hasLength(4));
-      final sim = bossSim(def);
-      final b = sim.boss!;
-      for (var broken = 0; broken <= 4; broken++) {
-        for (var i = 0; i < 4; i++) {
-          b.plates[i] = i < broken ? 0 : b.plateMax;
-        }
-        expect(b.exposure, def.exposure[broken]);
-      }
-      for (var i = 1; i < def.exposure.length; i++) {
-        expect(def.exposure[i], greaterThan(def.exposure[i - 1]));
-      }
     });
   });
 

@@ -51,9 +51,16 @@ class FakeCloud implements CloudBackend {
     if (existing != null) {
       uid = existing; // credential already in use: switch accounts
     } else {
+      uid ??= 'google-$googleUser';
       googleAccounts[googleUser] = uid!;
     }
     return CloudAccount(uid: uid!, email: '$googleUser@x.com', linked: true);
+  }
+
+  @override
+  Future<void> signOut() async {
+    _net();
+    uid = null;
   }
 
   @override

@@ -2,8 +2,8 @@
 /// implementation; tests use an in-memory fake. Keeping the interface small
 /// means the game never depends on Firebase types directly.
 abstract interface class CloudBackend {
-  /// Signs in (anonymously the first time, the same account afterwards)
-  /// and returns the player's account.
+  /// Restores the signed-in player's account. Fails if nobody is signed in:
+  /// accounts are only ever created by [linkGoogle], at the player's request.
   Future<CloudAccount> signIn();
 
   /// The player's saved document, or null if none exists yet.
@@ -12,10 +12,13 @@ abstract interface class CloudBackend {
   /// Replaces the player's saved document.
   Future<void> pushSave(Map<String, Object?> save);
 
-  /// Links the current account to Google so progress survives reinstalls
-  /// and moves between phones. If that Google account already holds a
-  /// save, switches to it instead (the caller then merges both saves).
+  /// Signs in with Google so progress survives reinstalls and moves between
+  /// phones. If that Google account already holds a save, switches to it (the
+  /// caller then merges both saves).
   Future<CloudAccount> linkGoogle();
+
+  /// Signs out. The account and its cloud save stay for the next sign-in.
+  Future<void> signOut();
 
   /// Deletes the cloud save and the account (required by store policies).
   Future<void> deleteAccount();

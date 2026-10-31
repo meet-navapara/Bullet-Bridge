@@ -17,13 +17,7 @@ void autoPlay(GameSimulation sim) {
   for (final b in sim.balls) {
     if (target == null || b.y > target.y) target = b;
   }
-  final boss = sim.boss;
-  double goal = target?.x ?? sim.width / 2;
-  if (boss != null && !boss.dead) {
-    // Break the armour plates first; they shield the core.
-    final plate = boss.plates.indexWhere((p) => p > 0);
-    goal = plate < 0 ? boss.x : boss.plateX(plate);
-  }
+  final goal = target?.x ?? sim.width / 2;
   final dx = (goal - sim.cannonX).clamp(-6.0, 6.0);
   sim.moveCannonBy(dx);
 }
@@ -134,9 +128,11 @@ void main() {
     }, elements: Element.values.toSet());
     for (var stage = 1; stage <= StageSpec.levelCount; stage++) {
       // Early levels with the mid loadout, the rest with a maxed cannon so
-      // the soak covers all 100 levels in reasonable time.
+      // the soak covers every level in reasonable time. Generated levels get
+      // one seed each: there are nine times as many of them.
       final loadout = stage <= 10 ? strong : maxed;
-      for (var seed = 1; seed <= 3; seed++) {
+      final seeds = stage <= StageSpec.authoredLevels ? 3 : 1;
+      for (var seed = 1; seed <= seeds; seed++) {
         for (final element in [
           Element.values[seed % 4],
           Element.values[(seed + 2) % 4],

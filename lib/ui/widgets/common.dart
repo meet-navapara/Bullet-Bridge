@@ -396,6 +396,8 @@ class NotifyDot extends StatelessWidget {
 
 /// Fade + slight upward slide page transition.
 Route<T> gameRoute<T>(Widget page) => PageRouteBuilder<T>(
+  // The name is what analytics reports for this screen.
+  settings: RouteSettings(name: page.runtimeType.toString()),
   transitionDuration: const Duration(milliseconds: 260),
   reverseTransitionDuration: const Duration(milliseconds: 200),
   pageBuilder: (_, _, _) => page,

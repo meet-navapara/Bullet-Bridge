@@ -21,20 +21,21 @@ The package name is permanent once the app is on Google Play.
 
 | Feature | Firebase product | Where in code |
 |---|---|---|
-| Silent sign-in for every player (no login screen) | Authentication → Anonymous | `lib/services/cloud/firebase_cloud_backend.dart` |
-| "Sign in with Google" to keep progress after a reinstall or on a new phone | Authentication → Google | same file, `linkGoogle` |
+| First-launch choice: "Continue with Google" or "Continue as Guest" | none | `lib/ui/screens/welcome_screen.dart` |
+| Google sign-in to keep progress after a reinstall or on a new phone | Authentication → Google | `lib/services/cloud/firebase_cloud_backend.dart`, `linkGoogle` |
 | Cloud copy of all progress | Cloud Firestore, `players/{uid}` | `lib/services/cloud/cloud_sync.dart` |
 | Safe merging of two devices' progress | none (game code) | `lib/progress/save_merge.dart` |
 | Gameplay statistics | Google Analytics | `lib/services/analytics_service.dart` |
 | Crash reports | Crashlytics | `lib/services/firebase_setup.dart` |
-| Settings: cloud status, Google sign-in, Sync Now, Delete Cloud Data, Share Usage Data switch | none | `lib/ui/widgets/cloud_save_panel.dart` |
+| Settings: cloud status, Google sign-in, Sign Out, Sync Now, Delete Cloud Data, Share Usage Data switch | none | `lib/ui/widgets/cloud_save_panel.dart` |
 | Security rules | Firestore rules | `firestore.rules` (with `firebase.json`) |
 
 ### How progress is kept
 
-1. At launch the game signs the player in anonymously, in the background.
-2. It downloads their cloud save, merges it with the phone's save and
-   uploads the result.
+1. On first launch the player chooses. A guest has no account: progress stays
+   on the phone and the rest of this list does not apply.
+2. After Google sign-in, and at each launch after that, the game downloads the
+   cloud save, merges it with the phone's save and uploads the result.
 3. After every change (a finished level, a purchase, a setting) the game
    uploads within about 4 seconds. Several changes close together are sent
    as one write. Leaving the app uploads immediately.
@@ -53,12 +54,14 @@ duplicated:
 
 **Accounts:**
 
-- An anonymous account is lost if the app is uninstalled. "Sign in with
-  Google" links it to a Google account.
-- After a reinstall, or on a new phone, tapping "Sign in with Google" again
-  finds the existing save and merges it into the phone.
-- "Delete Cloud Data" removes the document and the account. Google Play
-  requires this option for apps that create accounts.
+- Guest progress is lost if the app is uninstalled. Guests can sign in later
+  in Settings, which uploads what they have.
+- After a reinstall, or on a new phone, signing in again finds the existing
+  save and merges it into the phone.
+- "Sign Out" stops uploading and keeps the cloud save for the next sign-in.
+- "Delete Cloud Data" removes the document and the account, and the phone goes
+  back to guest. Google Play requires this option for apps that create
+  accounts.
 
 ## Step 1: Create the Firebase project
 
@@ -107,8 +110,8 @@ Google sign-in fails for any build signed with a key that is not listed.
 ## Step 4: Turn on the Firebase products
 
 1. **Authentication** → Get started → Sign-in method:
-   - Enable **Anonymous**.
-   - Enable **Google**: choose a support email and save.
+   - Enable **Google**: choose a support email and save. Anonymous sign-in is
+     no longer used.
 2. **Firestore Database** → Create database:
    1. Choose **Production mode**.
    2. Pick a location close to your players, for example `asia-south1`
@@ -136,12 +139,10 @@ flutter run            # or: flutter build apk --release
 
 On the phone:
 
-1. Open **Settings → Cloud Save**. Within a few seconds it should say
-   "Saved to the cloud."
-2. In Firebase console → Firestore → Data, a document should appear under
+1. On the first screen, tap **Continue with Google** and choose an account.
+2. Open **Settings → Cloud Save** and check that the panel shows your email.
+3. In Firebase console → Firestore → Data, a document should appear under
    `players/` with a `save` map.
-3. Tap **Sign in with Google**, choose an account, and check that the panel
-   shows your email.
 4. Test a restore: clear the app's data, or install it on a second phone.
    Open Settings → **Sign in with Google** with the same account; your
    levels, stars and upgrades come back.
@@ -166,6 +167,15 @@ adb shell setprop debug.firebase.analytics.app com.boomforge.game
 | `endless_end` | `wave`, `score` |
 | `upgrade_bought` | `upgrade`, `level` |
 | `cloud_linked` | none |
+| `screen_view` | `screen_name` (widget name, such as `ShopScreen`) |
+| `button_tap` | `button` (its label) |
+| `account_choice` | `choice` (`guest` or `google`) |
+| `account_signed_out`, `account_deleted` | none |
+| `element_selected` | `element` |
+| `power_up_used` | `power_up` |
+| `rewarded_ad` | `placement` (`continue` or `shop`), `earned` (0/1) |
+| `interstitial_shown` | none |
+| `item_bought` | `item` |
 
 No names, emails or device identifiers are logged as event data. Turning
 off "Share Usage Data" stops analytics and crash reports.
@@ -203,9 +213,10 @@ under Usage and billing.
 |---|---|
 | Settings says "not available in this build" | `android/app/google-services.json` is missing, or its package name is not `com.boomforge.game`. Run `flutter clean` and rebuild. |
 | Stays "Offline" | No internet, or Firestore was never created. Check Firestore → Data. |
-| `PERMISSION_DENIED` in logs | The rules were not published, or Anonymous auth is disabled. |
-| `admin-restricted-operation` in logs, panel says "Offline" | Anonymous sign-in is disabled: Authentication → Sign-in method → Anonymous → Enable. |
-| Google sign-in fails or does nothing | Add the SHA-1 and SHA-256 of the key that signed this build, download a fresh `google-services.json`, and check that the Google provider is enabled. |
+| `PERMISSION_DENIED` in logs | The rules were not published. |
+| "Sign-in is turned off" message | Google sign-in is disabled: Authentication → Sign-in method → Google → Enable. |
+| Google sign-in fails or does nothing | Add the SHA-1 and SHA-256 of the key that signed this build, download a fresh `google-services.json`, and check that the Google provider is enabled. The error `clientConfigurationError` usually means a missing fingerprint. |
+| Account sheet shows the wrong app name | Project settings → General → **Public-facing name**. |
 | No crash reports | Crashlytics only reports from release builds, after the app restarts, with Share Usage Data on. |
 
 ## Website: privacy policy, terms, account deletion
@@ -229,8 +240,8 @@ The delete page offers three ways to delete an account:
 1. In the game: Settings → Cloud Save → Delete Cloud Data.
 2. Google-linked players sign in on the page and delete their account and
    save themselves.
-3. Guests send their Player ID (shown in Settings → Cloud Save) through a
-   form. Requests land in Firestore → `deletionRequests`. **Check them
+3. Anyone who can't sign in sends their Player ID (shown in Settings → Cloud
+   Save) through a form. Guests have no cloud data to delete. Requests land in Firestore → `deletionRequests`. **Check them
    regularly**: within 30 days, delete `players/{Player ID}` and the user
    (Authentication → Users → search the ID), then delete the request.
 
@@ -252,7 +263,7 @@ Checked against Play policy, October 2026:
 | Privacy policy URL in Play Console and inside the app | Done (`/privacy`, Settings → Privacy Policy) |
 | In-app account deletion for apps that create accounts | Done (Delete Cloud Data) |
 | Web account-deletion link that works without the app | Done (`/delete-account`); enter it in Data safety |
-| Privacy policy names the developer and a privacy contact | **To do:** add a support email in `website/privacy.html` (marked with a comment) and pass `--dart-define=SUPPORT_EMAIL=...` |
+| Privacy policy names the developer and a privacy contact | Done (`website/privacy.html` and `AppConfig.supportEmail`) |
 | Data safety form matches the app | Fill it in as in "Store and privacy checklist" above |
 | Target audience | The policies say 13+. If you choose an audience under 13, the Families policy applies: ads must be child-directed (`ADMOB_CHILD_DIRECTED=true`), and Google sign-in, Analytics and the policy need review. |
 | Ads declaration | Answer "Yes, contains ads" if AdMob unit IDs are set in the release |

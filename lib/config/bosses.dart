@@ -1,11 +1,16 @@
-/// The ten campaign bosses as data. One shared boss engine
-/// (lib/game/sim/boss.dart + GameSimulation) runs all of them; each differs
-/// in silhouette, armour layout, phases, attacks and special rules.
+/// The campaign bosses as data. One shared boss engine
+/// (lib/game/sim/boss.dart + GameSimulation) runs all of them; the ten
+/// originals differ in silhouette, armour layout, phases, attacks and special
+/// rules, and later worlds fight recoloured variants with extra attacks.
 library;
 
+import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/painting.dart' show HSLColor;
+
 import '../game/sim/entities.dart';
+import 'balance.dart';
 
 enum BossId {
   crystalColossus,
@@ -71,7 +76,7 @@ class PlateDef {
   final double dy;
   final double radius;
 
-  /// Heads: this element deals double damage, all others half.
+  /// Heads: the element a head is coloured after.
   final Element? weakness;
 }
 
@@ -110,14 +115,10 @@ class BossDef {
     required this.colors,
     required this.coreRadius,
     required this.plates,
-    required this.exposure,
-    required this.coreHpFactor,
-    required this.plateHpFactor,
     required this.phases,
     required this.reward,
     this.minionKind = EnemyKind.shard,
     this.minionAffinity = false,
-    this.regrowHeads = false,
     this.headsFire = false,
   });
 
@@ -133,21 +134,25 @@ class BossDef {
   final double coreRadius;
   final List<PlateDef> plates;
 
-  /// Core damage multiplier indexed by the number of broken plates.
-  final List<double> exposure;
+  /// Share of the normal ball supply it carries. Busier attacks mean fewer
+  /// balls, so every fight is hard without being impossible: lava leaves the
+  /// least floor to dodge on.
+  double get ballSupplyScale {
+    if (phases.any((p) => p.attacks.contains(BossAttack.lava))) return 0.5;
+    if (headsFire) return 0.7;
+    var busiest = 0;
+    for (final p in phases) {
+      if (p.attacks.length > busiest) busiest = p.attacks.length;
+    }
+    return busiest >= 4 ? 0.7 : (busiest == 3 ? 0.85 : 1);
+  }
 
-  /// Durability as multiples of the level's durability scale.
-  final double coreHpFactor;
-  final double plateHpFactor;
   final List<PhaseDef> phases;
   final BossReward reward;
   final EnemyKind minionKind;
 
   /// Minions carry a random elemental affinity.
   final bool minionAffinity;
-
-  /// When a new phase starts, one broken plate grows back at 60%.
-  final bool regrowHeads;
 
   /// Fan attacks come from every living plate instead of the core.
   final bool headsFire;
@@ -170,14 +175,11 @@ abstract final class Bosses {
     BossDef(
       id: BossId.crystalColossus,
       name: 'Crystal Colossus',
-      tip: 'Break both rock plates, then crack the core. Dodge the slam!',
+      tip: 'Smash the balls it throws to drain its health. Dodge the slam!',
       shape: BossShape.colossus,
       colors: [Color(0xFF8C5CFF), Color(0xFFE04DD0), Color(0xFFFF4B5C)],
       coreRadius: 62,
       plates: [PlateDef(-80, -6), PlateDef(80, -6)],
-      exposure: [0.25, 0.6, 1.0],
-      coreHpFactor: 34,
-      plateHpFactor: 8,
       phases: [
         PhaseDef(attacks: {BossAttack.rain}, moveSpeed: 50, tempo: 1.1),
         PhaseDef(
@@ -200,14 +202,11 @@ abstract final class Bosses {
     BossDef(
       id: BossId.stormEngine,
       name: 'Storm Engine',
-      tip: 'Step out of the glowing columns before the lightning strikes.',
+      tip: 'Every ball you smash hurts it. Step out of the glowing columns!',
       shape: BossShape.engine,
       colors: [Color(0xFF3DA0FF), Color(0xFF7B6CFF), Color(0xFFFFC23A)],
       coreRadius: 58,
       plates: [PlateDef(-78, 8, radius: 28), PlateDef(78, 8, radius: 28)],
-      exposure: [0.3, 0.65, 1.0],
-      coreHpFactor: 36,
-      plateHpFactor: 7,
       phases: [
         PhaseDef(attacks: {BossAttack.zap}, moveSpeed: 55),
         PhaseDef(
@@ -225,14 +224,11 @@ abstract final class Bosses {
     BossDef(
       id: BossId.moltenTitan,
       name: 'Molten Titan',
-      tip: 'Lava pools burn for a few seconds. Fire melts its rock plates.',
+      tip: 'Every ball you smash hurts it. Lava pools burn for a few seconds.',
       shape: BossShape.titan,
       colors: [Color(0xFFFF7A2B), Color(0xFFFF4B2B), Color(0xFFFFD23F)],
       coreRadius: 66,
       plates: [PlateDef(-84, 10), PlateDef(84, 10)],
-      exposure: [0.3, 0.65, 1.0],
-      coreHpFactor: 38,
-      plateHpFactor: 9,
       phases: [
         PhaseDef(
           attacks: {BossAttack.lava, BossAttack.rain},
@@ -249,7 +245,7 @@ abstract final class Bosses {
     BossDef(
       id: BossId.frostGuardian,
       name: 'Frost Guardian',
-      tip: 'Frozen ground slows your cannon. Keep moving between zones.',
+      tip: 'Every ball you smash hurts it. Frozen ground slows your cannon.',
       shape: BossShape.guardian,
       colors: [Color(0xFF7FE6FF), Color(0xFF5CB8FF), Color(0xFFB8F4FF)],
       coreRadius: 58,
@@ -258,9 +254,6 @@ abstract final class Bosses {
         PlateDef(0, 70, radius: 26),
         PlateDef(82, -4, radius: 28),
       ],
-      exposure: [0.25, 0.5, 0.75, 1.0],
-      coreHpFactor: 38,
-      plateHpFactor: 6,
       phases: [
         PhaseDef(attacks: {BossAttack.freeze, BossAttack.rain}, moveSpeed: 50),
         PhaseDef(
@@ -278,14 +271,12 @@ abstract final class Bosses {
     BossDef(
       id: BossId.voidDevourer,
       name: 'Void Devourer',
-      tip: 'It only takes real damage while its rift glows open. Wait for it!',
+      tip:
+          'Your shots pass right through it. Only smashing its balls hurts it.',
       shape: BossShape.devourer,
       colors: [Color(0xFF6A3FD0), Color(0xFF9B3FD0), Color(0xFFD03F9B)],
       coreRadius: 64,
       plates: [],
-      exposure: [1.0],
-      coreHpFactor: 30,
-      plateHpFactor: 0,
       phases: [
         PhaseDef(
           attacks: {BossAttack.curve, BossAttack.rain},
@@ -303,7 +294,7 @@ abstract final class Bosses {
     BossDef(
       id: BossId.ironBehemoth,
       name: 'Iron Behemoth',
-      tip: 'Four armour sections guard the core. Strip them one by one.',
+      tip: 'Smash its balls and its armour falls away, section by section.',
       shape: BossShape.behemoth,
       colors: [Color(0xFF8A96AE), Color(0xFFB07A5A), Color(0xFFE05A3A)],
       coreRadius: 60,
@@ -313,9 +304,6 @@ abstract final class Bosses {
         PlateDef(-62, 44, radius: 26),
         PlateDef(62, 44, radius: 26),
       ],
-      exposure: [0.12, 0.3, 0.5, 0.75, 1.0],
-      coreHpFactor: 32,
-      plateHpFactor: 6,
       minionKind: EnemyKind.geode,
       phases: [
         PhaseDef(attacks: {BossAttack.rain, BossAttack.slam}, moveSpeed: 40),
@@ -339,7 +327,7 @@ abstract final class Bosses {
     BossDef(
       id: BossId.prismHydra,
       name: 'Prism Hydra',
-      tip: 'Each head is weak to one element: match its colour.',
+      tip: 'Smash its balls to bring down its heads. Every head fires shards.',
       shape: BossShape.hydra,
       colors: [Color(0xFF3DDC97), Color(0xFF2BB5C9), Color(0xFFE95CFF)],
       coreRadius: 54,
@@ -350,10 +338,6 @@ abstract final class Bosses {
         PlateDef(0, 84, radius: 30, weakness: Element.ice),
         PlateDef(88, -54, radius: 30, weakness: Element.electric),
       ],
-      exposure: [0.1, 0.35, 0.7, 1.0],
-      coreHpFactor: 30,
-      plateHpFactor: 8,
-      regrowHeads: true,
       headsFire: true,
       minionAffinity: true,
       phases: [
@@ -369,14 +353,11 @@ abstract final class Bosses {
     BossDef(
       id: BossId.gravityCore,
       name: 'Gravity Core',
-      tip: 'Its shards weave and it drags crystals towards itself.',
+      tip: 'Its shards weave and it drags its balls back. Keep smashing them!',
       shape: BossShape.gravity,
       colors: [Color(0xFF4D6BFF), Color(0xFF8A4DFF), Color(0xFFFF4DA6)],
       coreRadius: 60,
       plates: [PlateDef(-84, 0, radius: 28), PlateDef(84, 0, radius: 28)],
-      exposure: [0.4, 0.7, 1.0],
-      coreHpFactor: 36,
-      plateHpFactor: 7,
       phases: [
         PhaseDef(attacks: {BossAttack.curve, BossAttack.rain}, moveSpeed: 50),
         PhaseDef(
@@ -399,14 +380,11 @@ abstract final class Bosses {
     BossDef(
       id: BossId.chaosArchitect,
       name: 'Chaos Architect',
-      tip: 'Every phase rebuilds its attacks from earlier bosses.',
+      tip: 'Every phase brings attacks from earlier bosses. Smash its balls!',
       shape: BossShape.architect,
       colors: [Color(0xFFFF5CA8), Color(0xFFFF9F2B), Color(0xFF2BE0FF)],
       coreRadius: 58,
       plates: [PlateDef(-82, 12, radius: 30), PlateDef(82, 12, radius: 30)],
-      exposure: [0.3, 0.65, 1.0],
-      coreHpFactor: 32,
-      plateHpFactor: 8,
       phases: [
         PhaseDef(attacks: {BossAttack.rain, BossAttack.zap}, moveSpeed: 55),
         PhaseDef(
@@ -424,7 +402,7 @@ abstract final class Bosses {
     BossDef(
       id: BossId.worldbreaker,
       name: 'Worldbreaker',
-      tip: 'Four phases. Break the crust, then strike the rift when it opens.',
+      tip: 'Four phases and a huge supply of balls. Smash every last one!',
       shape: BossShape.worldbreaker,
       colors: [
         Color(0xFFFF6A3D),
@@ -439,9 +417,6 @@ abstract final class Bosses {
         PlateDef(-60, 58, radius: 26),
         PlateDef(60, 58, radius: 26),
       ],
-      exposure: [0.15, 0.35, 0.55, 0.8, 1.0],
-      coreHpFactor: 32,
-      plateHpFactor: 7,
       phases: [
         PhaseDef(attacks: {BossAttack.rain, BossAttack.slam}, moveSpeed: 45),
         PhaseDef(
@@ -472,6 +447,106 @@ abstract final class Bosses {
 
   static BossDef of(BossId id) => all[id.index];
 
+  /// Names the worlds after the first: world 2 is chapters 11-20, and so on.
+  static const List<String> worldPrefixes = [
+    'Ashen',
+    'Sunken',
+    'Gilded',
+    'Haunted',
+    'Shattered',
+    'Emerald',
+    'Midnight',
+    'Blazing',
+    'Eternal',
+  ];
+
+  /// One boss per campaign chapter: the ten originals, then their variants.
+  static final List<BossDef> campaign = List.unmodifiable([
+    ...all,
+    for (var c = all.length + 1; c <= StageSpec.chapters; c++) _variant(c),
+  ]);
+
   /// Boss of a chapter (1-based).
-  static BossDef forChapter(int chapter) => all[(chapter - 1) % all.length];
+  static BossDef forChapter(int chapter) => campaign[chapter - 1];
+
+  /// A later world's take on an original boss. It keeps the silhouette,
+  /// armour and special rules (its tip stays true) and adds one attack per
+  /// phase, so the same shape asks for a different dodge.
+  static BossDef _variant(int chapter) {
+    final base = all[(chapter - 1) % all.length];
+    final world = (chapter - 1) ~/ all.length;
+    final hasLava = base.phases.any((p) => p.attacks.contains(BossAttack.lava));
+    return BossDef(
+      id: base.id,
+      name: '${worldPrefixes[world - 1]} ${base.name}',
+      tip: base.tip,
+      shape: base.shape,
+      colors: [for (final c in base.colors) shiftHue(c, world * 40)],
+      coreRadius: base.coreRadius,
+      plates: base.plates,
+      phases: [
+        for (var i = 0; i < base.phases.length; i++)
+          _variantPhase(base.phases[i], world, base.id.index + i * 3),
+      ],
+      reward: BossReward(coins: 1000 + 30 * (chapter - all.length)),
+      // Armoured minions take too long to clear with lava on the floor.
+      minionKind: world % 3 == 0 && !hasLava
+          ? EnemyKind.geode
+          : base.minionKind,
+      minionAffinity: base.minionAffinity || world >= 5,
+      headsFire: base.headsFire,
+    );
+  }
+
+  static const int _maxAttacksPerPhase = 4;
+  static const Set<BossAttack> _floorAttacks = {
+    BossAttack.lava,
+    BossAttack.freeze,
+  };
+
+  static const double _variantLavaTempo = 1.2;
+  static const double _maxTempo = 1.2;
+
+  static PhaseDef _variantPhase(PhaseDef phase, int world, int offset) {
+    final attacks = {...phase.attacks};
+    // Lava leaves little floor to dodge on, so those phases stay as they are.
+    // Weak-point phases keep the player waiting, so they only gain minions:
+    // more shots there left no safe way through.
+    final List<BossAttack> pool = phase.attacks.contains(BossAttack.lava)
+        ? const []
+        : phase.weakWindows
+        ? const [BossAttack.minions]
+        : BossAttack.values;
+    for (var i = 0; i < pool.length; i++) {
+      if (attacks.length >= _maxAttacksPerPhase) break;
+      final extra = pool[(world + offset + i) % pool.length];
+      // Pull only steers minions, so it needs them in the same phase.
+      if (extra == BossAttack.pull && !attacks.contains(BossAttack.minions)) {
+        continue;
+      }
+      // Two kinds of floor zone can leave nowhere safe to stand.
+      if (_floorAttacks.contains(extra) &&
+          attacks.any(_floorAttacks.contains)) {
+        continue;
+      }
+      if (attacks.add(extra)) break;
+    }
+    // Same tempo as the original, as the new attack is the added challenge.
+    // Lava comes slower: late durability makes those fights longer than the
+    // original's, and each pool stays on the floor for seconds.
+    return PhaseDef(
+      attacks: attacks,
+      moveSpeed: phase.moveSpeed,
+      tempo: phase.attacks.contains(BossAttack.lava)
+          ? math.min(_maxTempo, phase.tempo * _variantLavaTempo)
+          : phase.tempo,
+      weakWindows: phase.weakWindows,
+    );
+  }
+}
+
+/// [color] with its hue rotated by [degrees].
+Color shiftHue(Color color, double degrees) {
+  final hsl = HSLColor.fromColor(color);
+  return hsl.withHue((hsl.hue + degrees) % 360).toColor();
 }

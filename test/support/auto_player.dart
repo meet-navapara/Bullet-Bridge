@@ -130,23 +130,6 @@ class AutoPlayer {
 
   /// Where the player wants to shoot.
   double? _targetX(GameSimulation sim) {
-    final b = sim.boss;
-    if (b != null && !b.dead) {
-      // Plates/heads first (the matching head if any), then the core; with
-      // weak windows, minions while the rift is shut.
-      var plate = -1;
-      for (var i = 0; i < b.plates.length; i++) {
-        if (b.plates[i] <= 0) continue;
-        final weak = b.def.plates[i].weakness;
-        if (plate < 0 || (weak != null && weak == sim.element)) plate = i;
-      }
-      if (plate >= 0) return b.plateX(plate);
-      if (b.hasWeakWindows && !b.weakOpen) {
-        final low = _lowestBall(sim);
-        if (low != null) return low.x;
-      }
-      return b.x;
-    }
     return _lowestBall(sim)?.x;
   }
 
@@ -169,31 +152,20 @@ class AutoPlayer {
   void _chooseElement(GameSimulation sim) {
     final have = sim.loadout.elements;
     Element pick = have.contains(Element.fire) ? Element.fire : Element.kinetic;
-    final b = sim.boss;
-    if (b != null && !b.dead) {
-      for (var i = 0; i < b.plates.length; i++) {
-        final weak = b.def.plates[i].weakness;
-        if (b.plates[i] > 0 && weak != null && have.contains(weak)) {
-          pick = weak;
-          break;
-        }
+    final target = _lowestBall(sim);
+    final a = target?.affinity;
+    if (a != null) {
+      final counter = Affinity.weakness(a);
+      if (have.contains(counter)) {
+        pick = counter;
+      } else if (pick == a) {
+        pick = Element.kinetic;
       }
-    } else {
-      final target = _lowestBall(sim);
-      final a = target?.affinity;
-      if (a != null) {
-        final counter = Affinity.weakness(a);
-        if (have.contains(counter)) {
-          pick = counter;
-        } else if (pick == a) {
-          pick = Element.kinetic;
-        }
-      } else if (target != null &&
-          !target.armored &&
-          sim.balls.length >= 5 &&
-          have.contains(Element.electric)) {
-        pick = Element.electric;
-      }
+    } else if (target != null &&
+        !target.armored &&
+        sim.balls.length >= 5 &&
+        have.contains(Element.electric)) {
+      pick = Element.electric;
     }
     if (pick != sim.element) sim.setElement(pick);
   }
@@ -218,8 +190,7 @@ class AutoPlayer {
     final b = sim.boss;
     if (b != null &&
         !b.dead &&
-        b.transition <= 0 &&
-        (b.platesLeft == 0 || b.weakOpen) &&
+        sim.balls.length >= 3 &&
         sim.canActivate(PowerUpType.powerShot)) {
       sim.activatePowerUp(PowerUpType.powerShot);
     }

@@ -1,3 +1,4 @@
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -16,10 +17,53 @@ val keystoreProperties = Properties().apply {
 }
 val hasReleaseKey = keystoreProperties.getProperty("storeFile") != null
 
-// AdMob app ID. Defaults to Google's public sample app ID; pass the real one
-// with -PadmobAppId=ca-app-pub-xxx~yyy or ADMOB_APP_ID in gradle.properties.
-val admobAppId: String = (project.findProperty("admobAppId") as String?)
+// Values from --dart-define / --dart-define-from-file (release.json). Flutter
+// passes them to Gradle base64-encoded.
+val dartDefines: Map<String, String> = (project.findProperty("dart-defines") as String?)
+    .orEmpty()
+    .split(",")
+    .filter { it.isNotEmpty() }
+    .map { String(Base64.getDecoder().decode(it)) }
+    .associate { it.substringBefore("=") to it.substringAfter("=") }
+
+// AdMob app ID. Defaults to Google's public sample app ID for local builds.
+val admobAppId: String = dartDefines["ADMOB_APP_ID_ANDROID"]
     ?: "ca-app-pub-3940256099942544~3347511713"
+
+// A Play bundle must never go out with the debug key, Google's sample ads or,
+// by accident, no ads at all. `ADS_DISABLED=true` is the deliberate ad-free
+// release. See docs/PRODUCTION_SETUP.md.
+if (gradle.startParameter.taskNames.any { it.endsWith("bundleRelease") }) {
+    val samplePublisher = "3940256099942544"
+    val publisher = Regex("^ca-app-pub-(\\d+)[~/]\\d+$")
+    fun publisherOf(key: String) = publisher.find(dartDefines[key].orEmpty())?.groupValues?.get(1)
+
+    val problems = buildList {
+        if (!hasReleaseKey) add("android/key.properties is missing (upload key)")
+        if (dartDefines["ADS_DISABLED"] != "true") {
+            val keys = listOf(
+                "ADMOB_APP_ID_ANDROID",
+                "ADMOB_REWARDED_ANDROID",
+                "ADMOB_INTERSTITIAL_ANDROID",
+            )
+            val publishers = keys.map { key ->
+                val id = publisherOf(key)
+                if (id == null) add("$key is missing or malformed in release.json")
+                if (id == samplePublisher) add("$key is one of Google's sample IDs")
+                id
+            }
+            if (publishers.filterNotNull().toSet().size > 1) {
+                add("the AdMob IDs in release.json belong to different publishers")
+            }
+        }
+    }
+    if (problems.isNotEmpty()) {
+        throw GradleException(
+            "Not a valid Play release:\n" + problems.joinToString("\n") { " - $it" } +
+                "\nBuild with: flutter build appbundle --dart-define-from-file=release.json",
+        )
+    }
+}
 
 android {
     // Choose your permanent package name before the first Play upload; it

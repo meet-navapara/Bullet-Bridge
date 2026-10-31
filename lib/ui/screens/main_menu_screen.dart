@@ -4,6 +4,7 @@ import '../../app/app_services.dart';
 import '../../economy/catalog.dart';
 import '../../economy/upgrades.dart';
 import '../../progress/achievements.dart';
+import '../../render/menu_icon_art.dart';
 import '../theme/palette.dart';
 import '../widgets/art.dart';
 import '../widgets/common.dart';
@@ -150,7 +151,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                             children: left
                                 ? [
                                     _SideButton(
-                                      icon: Icons.upgrade_rounded,
+                                      icon: MenuIcon.upgrade,
                                       label: 'Upgrade',
                                       tone: ButtonTone.green,
                                       compact: compact,
@@ -159,7 +160,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                                     ),
                                     const SizedBox(height: Gaps.sm),
                                     _SideButton(
-                                      icon: Icons.storefront_rounded,
+                                      icon: MenuIcon.shop,
                                       label: 'Shop',
                                       tone: ButtonTone.blue,
                                       compact: compact,
@@ -168,7 +169,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                                   ]
                                 : [
                                     _SideButton(
-                                      icon: Icons.card_giftcard_rounded,
+                                      icon: MenuIcon.daily,
                                       label: 'Daily',
                                       tone: ButtonTone.red,
                                       compact: compact,
@@ -178,7 +179,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                                     ),
                                     const SizedBox(height: Gaps.sm),
                                     _SideButton(
-                                      icon: Icons.emoji_events_rounded,
+                                      icon: MenuIcon.goals,
                                       label: 'Goals',
                                       tone: ButtonTone.purple,
                                       compact: compact,
@@ -283,7 +284,7 @@ class _SideButton extends StatelessWidget {
     this.badge,
     this.compact = false,
   });
-  final IconData icon;
+  final MenuIcon icon;
   final String label;
   final ButtonTone tone;
   final VoidCallback onTap;
@@ -297,7 +298,10 @@ class _SideButton extends StatelessWidget {
     // The whole button (icon and caption) is one tap target.
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+      onTap: () {
+        AppScope.of(context).analytics.buttonTap(label);
+        onTap();
+      },
       child: SizedBox(
         width: compact ? 64 : 74,
         child: Stack(
@@ -307,16 +311,10 @@ class _SideButton extends StatelessWidget {
               children: [
                 GameButton(
                   label: '',
+                  analyticsName: label,
                   tone: tone,
                   height: compact ? 48 : 58,
-                  icon: Icon(
-                    icon,
-                    color: Colors.white,
-                    size: compact ? 26 : 32,
-                    shadows: const [
-                      Shadow(color: Palette.outline, offset: Offset(0, 2)),
-                    ],
-                  ),
+                  icon: MenuIconView(icon: icon, size: compact ? 36 : 44),
                   onPressed: onTap,
                 ),
                 const SizedBox(height: 2),
@@ -355,7 +353,10 @@ class _GroundTile extends StatelessWidget {
       button: true,
       label: label,
       child: GestureDetector(
-        onTap: onTap,
+        onTap: () {
+          AppScope.of(context).analytics.buttonTap(label);
+          onTap();
+        },
         child: Stack(
           clipBehavior: Clip.none,
           children: [

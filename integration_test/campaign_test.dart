@@ -43,7 +43,7 @@ final Map<UpgradeType, int> lateGame = {
 
 /// Levels played: chapter 1 start, challenge, final test and boss, chapter 2
 /// start, a mid-campaign recovery level and three late bosses.
-const levels = [1, 5, 9, 10, 11, 26, 50, 90, 100];
+const levels = [1, 5, 9, 10, 11, 26, 50, 90, 100, 101, 505, 1000];
 
 class StageReport {
   StageReport(this.stage);
@@ -183,12 +183,7 @@ void main() {
         for (final b in sim.balls) {
           if (target == null || b.y > target.y) target = b;
         }
-        final boss = sim.boss;
-        double goal = target?.x ?? sim.width / 2;
-        if (boss != null && !boss.dead) {
-          final plate = boss.plates.indexWhere((p) => p > 0);
-          goal = plate < 0 ? boss.x : boss.plateX(plate);
-        }
+        final goal = target?.x ?? sim.width / 2;
         final dxWorld = (goal - sim.cannonX).clamp(-14.0, 14.0);
         await finger.moveBy(Offset(dxWorld * size.width / sim.width, 0));
         await tester.pump(const Duration(milliseconds: 16));

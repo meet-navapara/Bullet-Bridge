@@ -341,14 +341,23 @@ abstract final class ChainSpec {
   static const int scorePerSquare = 25;
 }
 
-/// Campaign layout: 10 chapters of 10 levels; every tenth level is a boss.
+/// Campaign layout: 100 chapters of 10 levels; every tenth level is a boss.
 /// The level data itself lives in lib/config/campaign.dart.
 abstract final class StageSpec {
-  static const int chapters = 10;
+  static const int chapters = 100;
   static const int levelsPerChapter = 10;
   static const int levelCount = chapters * levelsPerChapter;
+
+  /// Chapters 1-10 are written by hand; later ones are generated from them.
+  static const int authoredChapters = 10;
+  static const int authoredLevels = authoredChapters * levelsPerChapter;
   static const int clearBonusBase = 15;
   static const int clearBonusPerStage = 5;
+
+  /// Clear bonus stops growing with the authored levels: by then upgrades are
+  /// near their caps, so bigger payouts would have nothing to buy.
+  static int clearBonus(int level) =>
+      clearBonusBase + clearBonusPerStage * math.min(level, authoredLevels);
 
   /// Replaying an already cleared level pays this share of its clear bonus
   /// (the first clear pays double), so replays never repeat the full reward.
@@ -358,18 +367,29 @@ abstract final class StageSpec {
   static int chapterOf(int level) => (level - 1) ~/ levelsPerChapter + 1;
 }
 
-/// Curves the 100 campaign levels are built from. Category multipliers and
+/// Curves the campaign levels are built from. Category multipliers and
 /// per-level patterns are applied on top in lib/config/campaign.dart.
 abstract final class CampaignSpec {
-  /// Durability scale: 10 at level 1, ~41 at level 10, ~490 at level 100.
+  /// Durability scale: 10 at level 1, ~41 at level 10, ~580 at level 100.
   /// It grows roughly with the damage an upgraded cannon deals at that
   /// point, so it is polynomial, not exponential like Endless.
   static const double hpBase = 10;
   static const double hpSlope = 0.25;
   static const double hpPower = 1.25;
 
-  static double durabilityAt(int level) =>
-      hpBase * math.pow(1 + hpSlope * (level - 1), hpPower).toDouble();
+  /// Upgrades are capped, so past the authored levels durability only creeps
+  /// up: this much in total between level 100 and the last level. Difficulty
+  /// there comes from wave combinations and boss attacks instead.
+  static const double lateHpGrowth = 0.15;
+
+  static double durabilityAt(int level) {
+    double curve(int l) =>
+        hpBase * math.pow(1 + hpSlope * (l - 1), hpPower).toDouble();
+    const end = StageSpec.authoredLevels;
+    if (level <= end) return curve(level);
+    final late = (level - end) / (StageSpec.levelCount - end);
+    return curve(end) * (1 + lateHpGrowth * late);
+  }
 
   /// Later waves of a level are this much tougher than the previous one.
   static const double waveHpRamp = 0.1;
@@ -377,15 +397,22 @@ abstract final class CampaignSpec {
   /// Pace rises by this per level before category adjustments and caps.
   static const double paceSlope = 0.003;
 
+  /// Levels past the authored ones stay on level 100's base pace, so category
+  /// offsets (recovery levels above all) still make a difference.
   static double paceAt(int level) =>
-      SpeedSpec.startPace + paceSlope * (level - 1);
+      SpeedSpec.startPace +
+      paceSlope * (math.min(level, StageSpec.authoredLevels) - 1);
 
   static double driftAt(int level) =>
       1 + (SpeedSpec.maxDrift - 1) * ((level - 1) / 99).clamp(0.0, 1.0);
 
-  /// Coin pickups are worth more in later chapters (×1.0 … ×2.35).
+  /// Coin pickups are worth more in later chapters (×1.0 … ×2.35, the most
+  /// from chapter 10 on).
   static double coinScale(int level) =>
-      1 + 0.15 * (StageSpec.chapterOf(level) - 1);
+      1 +
+      0.15 *
+          (math.min(StageSpec.chapterOf(level), StageSpec.authoredChapters) -
+              1);
 }
 
 /// Shared boss tuning. Per-boss data (shape, plates, phases, attacks) is in
@@ -408,7 +435,6 @@ abstract final class BossSpec {
   static const double slamTelegraph = 1.1;
   static const double slamSpeed = 620;
   static const double spawnInterval = 8.0;
-  static const int maxMinions = 6;
   static const double fanInterval = 3.2;
 
   /// Lightning columns: warning, then an instant strike.
@@ -436,16 +462,58 @@ abstract final class BossSpec {
   /// Gravity pull: minions turn towards the boss.
   static const double pullInterval = 8.5;
 
-  /// Weak-point cycle (closed, warning, open), in seconds.
-  static const double weakClosed = 6.0;
-  static const double weakWarning = 1.0;
-  static const double weakOpen = 3.6;
-  static const double weakClosedExposure = 0.12;
-  static const double weakOpenExposure = 1.6;
+  /// Thrown balls. A boss has a fixed supply and keeps throwing it; every ball
+  /// destroyed (split pieces too) takes its share of the boss's health, and
+  /// the boss goes down with the last one.
+  static const double firstThrowDelay = 0.8;
+  static const double throwWindup = 0.35;
+  static const double throwRecoilTime = 0.3;
 
-  /// Element-weak heads: damage from the matching element / any other.
-  static const double headWeakMultiplier = 2.0;
-  static const double headOtherMultiplier = 0.5;
+  /// Downward speed a ball leaves the boss with.
+  static const double throwVelocity = 60;
+  static const double throwAtCannonChance = 0.7;
+
+  /// Balls in the arena at once; further throws wait for room.
+  static const int maxThrownAlive = 6;
+
+  /// Each phase throws this much faster than the one before.
+  static const double throwPhaseScale = 0.85;
+
+  static const int ballsBase = 10;
+  static const int ballsPerChapter = 2;
+  static const int ballsMax = 32;
+
+  /// Harder chapters, first the ten written by hand and then slowly.
+  static int ballCountFor(int chapter) {
+    final authored = chapter < 10 ? chapter : 10;
+    final later = chapter > 10 ? (chapter - 10) ~/ 15 : 0;
+    return math.min(ballsMax, ballsBase + ballsPerChapter * authored + later);
+  }
+
+  /// Largest ball a boss of this chapter throws.
+  static int maxThrownTierFor(int chapter) => chapter <= 1 ? 1 : 2;
+
+  /// Seconds between throws in a boss's first phase.
+  static double throwIntervalFor(int chapter) =>
+      math.max(1.6, 2.6 - 0.1 * math.min(chapter, 10));
+
+  /// A boss's supply as ball tiers in throwing order: small to start with,
+  /// the biggest towards the end.
+  static List<int> ballPlan(
+    int chapter,
+    double Function() random, {
+    double supplyScale = 1,
+  }) {
+    final count = (ballCountFor(chapter) * supplyScale).round();
+    final top = maxThrownTierFor(chapter);
+    return [
+      for (var i = 0; i < count; i++)
+        (((i / count) + (random() - 0.5) * 0.4) * (top + 1))
+            .floor()
+            .clamp(0, top)
+            .toInt(),
+    ];
+  }
 
   static const int defeatCoins = 60;
 }

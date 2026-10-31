@@ -29,10 +29,10 @@ development builds).
   - gold Treasure crystals;
   - elemental-affinity crystals that resist one element and are weak to
     another.
-- **Campaign:** 100 levels in 10 chapters, from Crystal Highlands to World's
+- **Campaign:** 1000 levels in 100 chapters across 10 worlds, from Crystal Highlands to World's
   Edge, each with its own environment.
   - Every chapter alternates easy, challenge and recovery levels and ends
-    with a unique boss on level 10, 20 … 100.
+    with its own boss on level 10, 20 … 1000.
   - Mechanics arrive one at a time: hazards, geodes, skyrays, treasure,
     swarms, giants, hazard clusters, affinities, bounce profiles, armoured
     swarms, survival waves and more. See docs/LEVEL_BALANCING.md.
@@ -40,6 +40,8 @@ development builds).
   Guardian, Void Devourer, Iron Behemoth, Prism Hydra, Gravity Core, Chaos
   Architect and the four-phase Worldbreaker. Each has:
   - its own silhouette and armour layout;
+  - a supply of balls it keeps throwing: shots pass through the boss, every
+    ball smashed drains its health, and it goes down with the last one;
   - telegraphed attacks: shard rain, slams, lightning columns, lava,
     freezing ground, weaving shots and gravity pulls;
   - several phases;
@@ -60,7 +62,8 @@ Package name: **`com.boomforge.game`** (Android and iOS).
 
 Every Firebase feature is built in:
 
-- anonymous accounts, with optional "Sign in with Google";
+- a first-launch choice: "Continue with Google" or "Continue as Guest" (no
+  account, nothing uploaded);
 - Firestore cloud save with safe merging between phones;
 - Analytics and Crashlytics.
 
@@ -82,12 +85,12 @@ flutter run --profile       # realistic performance (debug is much slower)
 flutter run                 # debug, Google test ads
 ```
 
-Release builds (ads disabled unless real IDs are passed, see
-`docs/PRODUCTION_SETUP.md`):
+Release builds. The Play bundle needs the upload key and `release.json` and
+stops with an error without them (see `docs/PRODUCTION_SETUP.md`):
 
 ```bash
-flutter build appbundle --release
-flutter build apk --release
+flutter build appbundle --release --dart-define-from-file=release.json
+flutter build apk --release   # local testing; no ads without release.json
 ```
 
 ## Test
@@ -105,7 +108,7 @@ dart run tool/generate_audio.dart                    # regenerate assets/audio (
 flutter test tool/render_icon_test.dart              # regenerate icon PNGs
 dart run flutter_launcher_icons                      # apply icons to platforms
 flutter test tool/balance/balance_report_test.dart   # endless-mode balance table
-flutter test tool/balance/campaign_report_test.dart  # plays all 100 levels with an
+flutter test tool/balance/campaign_report_test.dart  # plays all 1000 levels with an
                                                      # auto-player and a real economy;
                                                      # writes build/campaign_report.md
 flutter test tool/soak/soak_test.dart                # every level, many seeds, stall checks
@@ -119,7 +122,8 @@ FLUTTER_ROOT=<flutter sdk> flutter test tool/screenshots/screenshots_test.dart -
 lib/
   app/        app widget, service container (AppScope), lifecycle
   config/     balance.dart (tuning numbers, SpeedSpec, CampaignSpec),
-              campaign.dart (100 levels), bosses.dart (10 bosses), app/ads
+              campaign.dart (1000 levels), level_animation.dart (level skies),
+              bosses.dart (10 bosses + 90 variants), app/ads
   game/
     sim/      pure-Dart rules: simulation, entities, waves/levels, boss engine, RNG
     boomforge_game.dart   Flame game: loop, parallax world, rendering, FX
@@ -145,7 +149,7 @@ docs/         plan, architecture, balancing, testing, release, setup
 
 - **Release app crashes at start with `WorkDatabase` errors:** keep the R8
   rules in `android/app/proguard-rules.pro`.
-- **No ads:** expected in release builds without `ADMOB_*` dart-defines and
+- **No ads:** expected in local release APKs without `release.json` and
   whenever consent, network or fill fails. The game never depends on ads.
 - **No sound:** check in-game Settings and the device media volume. Audio
   errors are logged (`Audio disabled: ...`) and never crash the game.

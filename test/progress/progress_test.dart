@@ -472,12 +472,25 @@ void main() {
       expect(h.progress.data.levelBest[1], 500);
     });
 
-    test('the campaign ends at level 100', () async {
-      final h = Harness(data: SaveData(highestStageCleared: 99));
-      expect(h.progress.nextStage, 100);
-      await h.progress.commitRun(stageRun('w', 100));
+    test('the campaign ends at level 1000', () async {
+      final h = Harness(data: SaveData(highestStageCleared: 999));
+      expect(h.progress.nextStage, 1000);
+      await h.progress.commitRun(stageRun('w', 1000));
       expect(h.progress.campaignComplete, isTrue);
-      expect(h.progress.nextStage, 100);
+      expect(h.progress.nextStage, 1000);
+    });
+
+    test('players who finished level 100 can carry on', () async {
+      final h = Harness(data: SaveData(highestStageCleared: 100));
+      expect(h.progress.campaignComplete, isFalse);
+      expect(h.progress.nextStage, 101);
+      await h.progress.commitRun(stageRun('w', 101));
+      expect(h.progress.data.highestStageCleared, 101);
+    });
+
+    test('a finished campaign survives saving and loading', () {
+      final saved = SaveData(highestStageCleared: 1000).toJson();
+      expect(SaveData.fromJson(saved).highestStageCleared, 1000);
     });
 
     test('failed stages give no bonus and unlock nothing', () async {

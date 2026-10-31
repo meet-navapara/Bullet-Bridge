@@ -11,7 +11,15 @@ extension BossArt on CrystalArt {
     final flash = b.hitFlash / BallSpec.hitFlashTime;
     final center = Offset(b.x, b.y);
 
-    // Aura: brighter while invulnerable (entrance / phase change).
+    // The throwing motion: rears up and tenses, then lunges down at release.
+    final pose = b.throwPose;
+    c.save();
+    c.translate(b.x, b.y + pose * r * 0.22);
+    final squash = 1 + pose * 0.1;
+    c.scale(1 / squash, squash);
+    c.translate(-b.x, -b.y);
+
+    // Aura: brighter while it is not attacking (entrance / phase change).
     final aura = b.transition > 0 ? 1.0 : 0.5 + 0.15 * math.sin(time * 4);
     _fill.shader = ui.Gradient.radial(center, r * 2.3, [
       color.withValues(alpha: 0.42 * aura),
@@ -47,6 +55,7 @@ extension BossArt on CrystalArt {
     if (b.hasWeakWindows) _rift(c, b, r, time);
     c.restore();
     _plates(c, b, color, flash);
+    c.restore();
   }
 
   // ------------------------------------------------------------- shared
@@ -77,7 +86,7 @@ extension BossArt on CrystalArt {
         r: p.radius,
         coreColor: color,
         text: '',
-        armorFraction: b.plates[i] / b.plateMax,
+        armorFraction: b.plates[i] / Boss.plateMax,
         variant: 7 + i,
         flash: flash,
       );

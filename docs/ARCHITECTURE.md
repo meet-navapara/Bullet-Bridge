@@ -25,15 +25,16 @@ GameScreen ─► BoomforgeGame (Flame) ─► GameSimulation (pure Dart)
 | `game_simulation.dart` | One run: cannon, creatures, bullets, hazards, blasts, enemy shots, telegraphs, pickups, boss, hull, chains, waves, stage completion |
 | `entities.dart` | Data types and the `GameEvent` hierarchy |
 | `wave_director.dart` | `RunPlan` (`StagePlan` for a campaign level, `EndlessPlan`), wave contents per `SpawnPattern`, scattered hazards and hazard clusters |
-| `boss.dart` | Runtime state of any boss: plates or heads, phases, attack timers, and the slam and weak-point state machines |
+| `boss.dart` | Runtime state of any boss: plates or heads, phases, attack timers, ball supply and throw timing, and the slam state machine |
 
 Campaign and boss **data** live in `lib/config`:
 
 | File | Responsibility |
 |---|---|
 | `balance.dart` | Every tuning number. `SpeedSpec` is the single source of enemy speed (pace, drift and their caps); `CampaignSpec` holds the durability, pace and coin curves; `BossSpec` holds the shared attack timings |
-| `campaign.dart` | 10 `ChapterDef`s, the 10-slot `SlotDef` rhythm and per-level overrides, resolved once into 100 immutable `LevelDef`s (`Campaign.level(n)`) |
-| `bosses.dart` | 10 `BossDef`s: silhouette, colours, plate or head layout, exposure table, phases with attack sets and tempo, special rules, reward |
+| `campaign.dart` | 10 authored and 90 generated `ChapterDef`s, the 10-slot `SlotDef` rhythm and per-level overrides, resolved once into 1000 immutable `LevelDef`s (`Campaign.level(n)`) |
+| `level_animation.dart` | Each level's sky animation as data, painted by `render/ambient_art.dart` |
+| `bosses.dart` | 10 `BossDef`s plus 90 generated variants (`Bosses.campaign`): silhouette, colours, plate or head layout, phases with attack sets and tempo, special rules, reward |
 
 How a level reaches the simulation:
 
@@ -51,8 +52,8 @@ How a level reaches the simulation:
   boss → enemy shots → telegraphs → blasts → pickups → cannon collision →
   cleanup.
 - **Bullets** use a swept vertical test against every target type
-  (creatures, hazards, enemy shots, boss plates, boss core) and hit the
-  first one on their path, so hazards and plates genuinely block shots.
+  (creatures, hazards, enemy shots) and hit the first one on their path, so
+  hazards genuinely block shots. They pass through bosses.
 - **Damage pipeline:** `damageBall` handles shatter bonus (frozen + fire or
   explosive), rock armour (fire/explosives x2) and destruction; element side
   effects (splash, chill/freeze, arc) are applied after the direct hit.
@@ -80,10 +81,13 @@ How a level reaches the simulation:
     - lava and freeze `FloorZone`s;
     - weaving shots;
     - a pull that changes direction only.
-  - Special rules:
-    - exposure grows as plates break;
-    - weak-point windows;
-    - element-weak heads that can regrow.
+  - Health is the boss's ball supply (`BossSpec.ballPlan`):
+    - it keeps throwing balls, up to `maxThrownAlive` in the arena at once;
+    - bullets cannot hurt it; each ball destroyed, split pieces included,
+      takes one unit of health (`Boss.unitsLeft`);
+    - plates fall off and phases advance as health drops;
+    - busier bosses carry fewer balls (`BossDef.ballSupplyScale`);
+    - it goes down when the supply is thrown and the last ball is gone.
 - **Fairness:**
   - Every spawn, shard rain column, slam, lightning strike and floor zone is
     telegraphed.
@@ -113,7 +117,7 @@ How a level reaches the simulation:
 
 ## UI
 
-- `GameScreen` takes a level number (1–100), a daily challenge, or neither
+- `GameScreen` takes a level number (1–1000), a daily challenge, or neither
   (endless).
   - Chapters 2–10 use their chapter environment. Chapter 1, Endless and the
     daily challenge use the player's chosen theme.
@@ -162,8 +166,9 @@ How a level reaches the simulation:
   It also installs the Crashlytics error hooks.
 - `CloudSync` (`lib/services/cloud/`): cloud save behind a small
   `CloudBackend` interface. `FirebaseCloudBackend` uses Firebase Auth
-  (anonymous, optional Google link) and Firestore `players/{uid}`.
-  - On start it signs in, downloads the cloud save, runs
+  (Google only) and Firestore `players/{uid}`. Guests never reach it: the
+  choice is made on `WelcomeScreen` and kept in `GameSettings.accountMode`.
+  - On start it restores the account, downloads the cloud save, runs
     `PlayerProgress.mergeFrom` (rules in `lib/progress/save_merge.dart`) and
     uploads the result.
   - Later changes upload 4 s after the last one, or immediately when the

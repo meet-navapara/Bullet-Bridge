@@ -35,10 +35,18 @@ class AdsService {
 
   Future<void> initialize() async {
     if (!_enabled) return;
+    // Consent from an earlier session is good for this one, so returning
+    // players get ads even if the update below is slow or fails.
+    await _startAdsIfAllowed();
+    await _gatherConsent();
+    await _startAdsIfAllowed();
+  }
+
+  Future<void> _startAdsIfAllowed() async {
+    if (_canRequestAds) return;
     try {
-      await _gatherConsent().timeout(const Duration(seconds: 10));
-      _canRequestAds = await ConsentInformation.instance.canRequestAds();
-      if (!_canRequestAds) return;
+      if (!await ConsentInformation.instance.canRequestAds()) return;
+      _canRequestAds = true;
       await MobileAds.instance.initialize();
       await MobileAds.instance.updateRequestConfiguration(
         RequestConfiguration(
@@ -56,14 +64,20 @@ class AdsService {
     }
   }
 
+  /// Completes when the player has dismissed the consent form, however long
+  /// they take, so this must not have a timeout. Nothing waits on it.
   Future<void> _gatherConsent() {
     final done = Completer<void>();
     ConsentInformation.instance.requestConsentInfoUpdate(
       ConsentRequestParameters(),
       () async {
-        await ConsentForm.loadAndShowConsentFormIfRequired((error) {
-          if (error != null) debugPrint('Consent form: ${error.message}');
-        });
+        try {
+          await ConsentForm.loadAndShowConsentFormIfRequired((error) {
+            if (error != null) debugPrint('Consent form: ${error.message}');
+          });
+        } catch (e) {
+          debugPrint('Consent form failed: $e');
+        }
         if (!done.isCompleted) done.complete();
       },
       (error) {
@@ -90,6 +104,7 @@ class AdsService {
       await ConsentForm.showPrivacyOptionsForm((error) {
         if (error != null) debugPrint('Privacy options: ${error.message}');
       });
+      await _startAdsIfAllowed();
     } catch (e) {
       debugPrint('Privacy options failed: $e');
     }

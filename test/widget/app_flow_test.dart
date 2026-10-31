@@ -105,6 +105,22 @@ void main() {
     }
   });
 
+  testWidgets('the level map opens on the current chapter of a late save', (
+    tester,
+  ) async {
+    await boot(
+      tester,
+      size: const Size(393, 852),
+      data: SaveData(tutorialDone: true, highestStageCleared: 995),
+    );
+    await tester.tap(find.text('Levels').first);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text("Eternal World's Edge"), findsOneWidget);
+    expect(find.text('Crystal Highlands'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('first Play shows the tutorial, then the game; pause works', (
     tester,
   ) async {

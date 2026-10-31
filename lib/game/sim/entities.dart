@@ -519,6 +519,12 @@ class BossPhaseChanged extends GameEvent {
 
 /// A bullet bounced off a boss that cannot be hurt right now (entrance or
 /// phase change).
+class BossThrew extends GameEvent {
+  const BossThrew(this.x, this.y);
+  final double x;
+  final double y;
+}
+
 class BossShielded extends GameEvent {
   const BossShielded(this.x, this.y);
   final double x;
@@ -548,24 +554,9 @@ class CannonChilled extends GameEvent {
   final double y;
 }
 
-/// The boss's weak point opened (or closed).
-class WeakPointChanged extends GameEvent {
-  const WeakPointChanged(this.x, this.y, {required this.open});
-  final double x;
-  final double y;
-  final bool open;
-}
-
-/// The boss pulled its minions towards itself.
+/// The boss pulled its balls towards itself.
 class BossPulled extends GameEvent {
   const BossPulled(this.x, this.y);
-  final double x;
-  final double y;
-}
-
-/// A broken head grew back.
-class BossHeadRegrown extends GameEvent {
-  const BossHeadRegrown(this.x, this.y);
   final double x;
   final double y;
 }

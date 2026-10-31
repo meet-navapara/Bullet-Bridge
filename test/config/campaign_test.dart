@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orbit_blast/config/balance.dart';
 import 'package:orbit_blast/config/campaign.dart';
+import 'package:orbit_blast/config/level_animation.dart';
 import 'package:orbit_blast/game/sim/entities.dart';
 import 'package:orbit_blast/game/sim/game_simulation.dart';
 import 'package:orbit_blast/game/sim/seeded_random.dart';
@@ -10,26 +11,26 @@ LevelDef at(int n) => Campaign.level(n);
 
 void main() {
   group('campaign data', () {
-    test('100 levels in 10 chapters, numbered 1-100', () {
-      expect(Campaign.levels, hasLength(100));
-      expect(Campaign.chapters, hasLength(10));
-      for (var n = 1; n <= 100; n++) {
+    test('1000 levels in 100 chapters, numbered 1-1000', () {
+      expect(Campaign.levels, hasLength(1000));
+      expect(Campaign.chapters, hasLength(100));
+      for (var n = 1; n <= 1000; n++) {
         expect(at(n).number, n);
         expect(at(n).chapter, (n - 1) ~/ 10 + 1);
         expect(at(n).slot, (n - 1) % 10 + 1);
       }
-      expect(Campaign.chapters.map((c) => c.name).toSet(), hasLength(10));
-      expect(Campaign.chapters.map((c) => c.theme.id).toSet(), hasLength(10));
+      expect(Campaign.chapters.map((c) => c.name).toSet(), hasLength(100));
+      expect(Campaign.chapters.map((c) => c.theme.id).toSet(), hasLength(100));
     });
 
-    test('bosses are exactly levels 10, 20, ... 100, each different', () {
+    test('bosses are exactly every tenth level, each different', () {
       final bosses = [
         for (final l in Campaign.levels)
           if (l.isBoss) l.number,
       ];
-      expect(bosses, [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
+      expect(bosses, [for (var n = 10; n <= 1000; n += 10) n]);
       final names = {for (final n in bosses) at(n).boss!.name};
-      expect(names, hasLength(10));
+      expect(names, hasLength(100));
       for (final n in bosses) {
         expect(at(n).category, LevelCategory.boss);
         expect(at(n).boss, at(n).chapterDef.boss);
@@ -61,11 +62,72 @@ void main() {
           '${l.category}|${l.waves}|${l.patterns}|${l.ballsPerWave}|'
           '${l.maxTier}|${l.bounce}|${l.mechanics.length}|${l.boss?.name}';
       final sigs = Campaign.levels.map(signature).toSet();
-      expect(sigs.length, greaterThan(80));
+      expect(sigs.length, greaterThan(800));
       expect(
         Campaign.levels.expand((l) => l.patterns).toSet(),
         containsAll(SpawnPattern.values),
       );
+    });
+
+    test('heavy waves are spaced out on generated levels', () {
+      const heavy = {
+        SpawnPattern.giants,
+        SpawnPattern.armored,
+        SpawnPattern.armoredSwarm,
+      };
+      for (final l in Campaign.levels.skip(StageSpec.authoredLevels)) {
+        for (var w = 0; w < l.patterns.length; w++) {
+          if (!heavy.contains(l.patterns[w])) continue;
+          expect(w, lessThan(3), reason: 'level ${l.number}');
+          if (w > 0) {
+            expect(heavy, isNot(contains(l.patterns[w - 1])));
+          }
+        }
+      }
+    });
+
+    test('no level repeats the combination of an earlier level', () {
+      final seen = <String, int>{};
+      final repeats = <String>[];
+      for (final l in Campaign.levels) {
+        final earlier = seen[l.combination];
+        if (earlier != null) repeats.add('${l.number} copies $earlier');
+        seen[l.combination] ??= l.number;
+      }
+      expect(repeats, isEmpty);
+    });
+
+    test('every level has its own animation', () {
+      final keys = Campaign.levels.map((l) => l.animation.key).toSet();
+      expect(keys, hasLength(1000));
+      expect(
+        Campaign.levels.map((l) => l.animation.main).toSet(),
+        AmbientKind.values.toSet(),
+      );
+      for (final l in Campaign.levels) {
+        expect(l.animation.accent, isNot(l.animation.main));
+      }
+      for (var n = 2; n <= 1000; n++) {
+        expect(at(n).animation.main, isNot(at(n - 1).animation.main));
+      }
+    });
+
+    test('the first 100 levels keep their hand-tuned curves', () {
+      expect(CampaignSpec.durabilityAt(100), closeTo(580, 1));
+      expect(at(100).clearBonus, 515);
+      expect(at(100).coinScale, closeTo(2.35, 1e-9));
+    });
+
+    test('late levels stay within reach of a maxed cannon', () {
+      expect(
+        CampaignSpec.durabilityAt(1000),
+        closeTo(
+          CampaignSpec.durabilityAt(100) * (1 + CampaignSpec.lateHpGrowth),
+          1e-6,
+        ),
+      );
+      expect(at(1000).clearBonus, at(100).clearBonus);
+      expect(at(1000).coinScale, at(100).coinScale);
     });
 
     test('mechanics are introduced one at a time, then stay available', () {
@@ -81,7 +143,7 @@ void main() {
         expect(at(e.value).introduces, e.key);
         expect(at(e.value).has(e.key), isTrue);
         if (e.value > 1) expect(at(e.value - 1).has(e.key), isFalse);
-        expect(at(100).has(e.key), isTrue);
+        expect(at(1000).has(e.key), isTrue);
       }
       // New mechanics are taught on calm levels, never on hard ones.
       for (final n in firsts.values) {
@@ -147,18 +209,30 @@ void main() {
 
     test('difficulty rises overall but not on every level', () {
       var drops = 0;
-      for (var n = 2; n <= 100; n++) {
+      for (var n = 2; n <= 1000; n++) {
         if (at(n).durability < at(n - 1).durability) drops++;
       }
-      expect(drops, greaterThanOrEqualTo(20), reason: 'needs breathers');
-      // Chapter averages still climb.
-      double avg(int c) =>
-          [for (var l = (c - 1) * 10 + 1; l <= c * 10; l++) at(l).durability]
+      expect(drops, greaterThanOrEqualTo(200), reason: 'needs breathers');
+      // Chapter averages still climb over the authored chapters.
+      double avg(int first, int last) =>
+          [for (var l = first; l <= last; l++) at(l).durability]
               .reduce((a, b) => a + b) /
-          10;
+          (last - first + 1);
       for (var c = 2; c <= 10; c++) {
-        expect(avg(c), greaterThan(avg(c - 1)));
+        expect(
+          avg((c - 1) * 10 + 1, c * 10),
+          greaterThan(avg((c - 2) * 10 + 1, (c - 1) * 10)),
+        );
       }
+      // Past that the base curve keeps rising, but slowly enough that one
+      // world's mix of levels can outweigh it, so compare the far ends.
+      for (var n = 101; n <= 1000; n++) {
+        expect(
+          CampaignSpec.durabilityAt(n),
+          greaterThan(CampaignSpec.durabilityAt(n - 1)),
+        );
+      }
+      expect(avg(901, 1000), greaterThan(avg(101, 200)));
     });
 
     test('speed starts calm and is capped', () {
@@ -169,7 +243,7 @@ void main() {
         expect(l.drift, lessThanOrEqualTo(SpeedSpec.maxDrift));
       }
       // No sudden jumps between neighbouring levels.
-      for (var n = 2; n <= 100; n++) {
+      for (var n = 2; n <= 1000; n++) {
         expect((at(n).pace - at(n - 1).pace).abs(), lessThan(0.1));
       }
     });
@@ -232,11 +306,11 @@ void main() {
       expect(one.ballTimeScale, at(1).pace);
       // The old game reached time scale 1.0 by stage 8.
       expect(simFor(8).ballTimeScale, lessThan(0.6));
-      expect(simFor(100).ballTimeScale, lessThanOrEqualTo(SpeedSpec.maxPace));
+      expect(simFor(1000).ballTimeScale, lessThanOrEqualTo(SpeedSpec.maxPace));
     });
 
     test('split children and knock-backs never exceed the drift cap', () {
-      final sim = simFor(100)..debugClearSpawnQueue();
+      final sim = simFor(1000)..debugClearSpawnQueue();
       final big = Ball(id: 1, tier: 4, maxHp: 1, x: 180, y: 300, vx: 0, vy: 0);
       sim.balls.add(big);
       sim.damageBall(big, 10, source: DamageSource.bomb, pushFromX: 170);

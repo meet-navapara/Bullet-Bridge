@@ -13,7 +13,7 @@ import '../widgets/art.dart';
 import '../widgets/common.dart';
 import 'game_screen.dart';
 
-/// Campaign map: ten chapters of ten levels along winding paths. Chapters
+/// Campaign map: chapters of ten levels along winding paths. Chapters
 /// the player has not reached are shown locked; the current chapter opens
 /// scrolled into view.
 class WorldMapScreen extends StatefulWidget {
@@ -89,6 +89,11 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
             controller: _scroll,
             padding: const EdgeInsets.fromLTRB(Gaps.lg, 0, Gaps.lg, Gaps.xl),
             itemCount: Campaign.chapters.length,
+            // Known heights let the list open deep in the campaign without
+            // building every earlier chapter first.
+            itemExtentBuilder: (i, _) => i < Campaign.chapters.length
+                ? WorldMapScreen.chapterExtent(Campaign.chapters[i], data)
+                : null,
             itemBuilder: (context, i) {
               final chapter = Campaign.chapters[i];
               return Padding(
@@ -191,6 +196,19 @@ class _ChapterSection extends StatelessWidget {
   }
 }
 
+class _OneLine extends StatelessWidget {
+  const _OneLine(this.text, {required this.style});
+  final String text;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) => FittedBox(
+    fit: BoxFit.scaleDown,
+    alignment: Alignment.centerLeft,
+    child: Text(text, style: style, maxLines: 1),
+  );
+}
+
 /// Chapter header: its environment as a backdrop, name, boss and stars.
 class _ChapterBanner extends StatelessWidget {
   const _ChapterBanner({
@@ -241,7 +259,9 @@ class _ChapterBanner extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        // Late chapters have long names: shrink to one line
+                        // rather than cut a name off.
+                        _OneLine(
                           'CHAPTER ${chapter.number} · LEVELS '
                           '${chapter.firstLevel}-${chapter.lastLevel}',
                           style: TextStyles.caption.copyWith(
@@ -249,13 +269,8 @@ class _ChapterBanner extends StatelessWidget {
                             shadows: TextStyles.outlined,
                           ),
                         ),
-                        Text(
-                          chapter.name,
-                          style: TextStyles.heading,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
+                        _OneLine(chapter.name, style: TextStyles.heading),
+                        _OneLine(
                           locked
                               ? 'Beat level ${chapter.firstLevel - 1} to enter.'
                               : 'Boss: ${chapter.boss.name}',

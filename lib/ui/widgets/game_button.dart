@@ -5,7 +5,7 @@ import '../../services/audio_service.dart';
 import '../../services/haptics_service.dart';
 import '../theme/palette.dart';
 
-enum ButtonTone { yellow, green, blue, navy, red, purple }
+enum ButtonTone { yellow, green, blue, navy, red, purple, white }
 
 class _ToneColors {
   const _ToneColors(this.top, this.bottom, this.lip, this.text);
@@ -52,6 +52,12 @@ const _tones = {
     Color(0xFF5420A3),
     Colors.white,
   ),
+  ButtonTone.white: _ToneColors(
+    Color(0xFFFFFFFF),
+    Color(0xFFE9ECF4),
+    Color(0xFFB4BACB),
+    Color(0xFF1F1F1F),
+  ),
 };
 
 /// Chunky glossy arcade button with a pressed state, click sound and
@@ -67,7 +73,11 @@ class GameButton extends StatefulWidget {
     this.fontSize,
     this.expand = true,
     this.silent = false,
+    this.analyticsName,
   });
+
+  /// Name reported when tapped, for buttons whose [label] is empty.
+  final String? analyticsName;
 
   final String label;
   final VoidCallback? onPressed;
@@ -92,6 +102,8 @@ class _GameButtonState extends State<GameButton> {
       final services = AppScope.of(context);
       services.audio.play(Sfx.click);
       services.haptics.trigger(Haptic.selection);
+      final name = widget.analyticsName ?? widget.label;
+      if (name.isNotEmpty) services.analytics.buttonTap(name);
     }
     onPressed();
   }
@@ -192,8 +204,10 @@ class _GameButtonState extends State<GameButton> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       widget.icon!,
-                                      const SizedBox(width: 8),
-                                      Flexible(child: label),
+                                      if (widget.label.isNotEmpty) ...[
+                                        const SizedBox(width: 8),
+                                        Flexible(child: label),
+                                      ],
                                     ],
                                   ),
                           ),
@@ -240,6 +254,8 @@ class RoundIconButton extends StatelessWidget {
           final services = AppScope.of(context);
           services.audio.play(Sfx.click);
           services.haptics.trigger(Haptic.selection);
+          final name = tooltip;
+          if (name != null) services.analytics.buttonTap(name);
           onPressed();
         },
         child: Container(

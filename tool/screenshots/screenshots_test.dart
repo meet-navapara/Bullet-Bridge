@@ -42,10 +42,17 @@ String get _sdkFonts {
   return '$root/bin/cache/artifacts/material_fonts';
 }
 
+/// STORE_SHOTS=1 renders at 1080x1920 into store/screenshots/, because Google
+/// Play rejects screenshots taller than 2:1. tool/render_store_art_test.dart
+/// then removes their alpha channel.
+final bool _forStore = Platform.environment['STORE_SHOTS'] == '1';
+
 Future<void> _shot(WidgetTester tester, String name) async {
   await expectLater(
     find.byType(OrbitBlastApp),
-    matchesGoldenFile('out/$name.png'),
+    matchesGoldenFile(
+      _forStore ? '../../store/screenshots/$name.png' : 'out/$name.png',
+    ),
   );
 }
 
@@ -81,7 +88,7 @@ void main() {
   });
 
   testWidgets('screens', (tester) async {
-    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.physicalSize = Size(1080, _forStore ? 1920 : 2340);
     tester.view.devicePixelRatio = 2.75;
     addTearDown(tester.view.reset);
 
@@ -201,7 +208,7 @@ void main() {
     boss
       ..transition = 0
       ..y = boss.homeY
-      ..core = boss.coreMax * 0.5
+      ..unitsLeft = boss.unitsTotal ~/ 2
       ..phase = 2
       ..slam = SlamState.none
       ..armPhase();

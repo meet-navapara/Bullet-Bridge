@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 
 import '../config/app_config.dart';
 import '../progress/player_progress.dart';
+import '../progress/save_data.dart';
 import '../progress/save_repository.dart';
 import '../services/ads_service.dart';
 import '../services/analytics_service.dart';
@@ -109,10 +110,53 @@ class AppServices with WidgetsBindingObserver {
           : AnalyticsService.disabled(),
     );
     WidgetsBinding.instance.addObserver(services);
-    unawaited(services.cloud.start());
-    // Consent + ad loading happen in the background; play never waits.
-    unawaited(services.ads.initialize());
+    // The ad consent form waits for the welcome screen, if there is one.
+    if (!services.needsWelcome) {
+      if (progress.data.settings.accountMode == AccountMode.google) {
+        unawaited(services.cloud.start());
+      }
+      // Consent + ad loading happen in the background; play never waits.
+      unawaited(services.ads.initialize());
+    }
     return services;
+  }
+
+  /// True until the player has chosen Google or guest on this device. Builds
+  /// without cloud saves have nothing to choose.
+  bool get needsWelcome =>
+      cloud.enabled &&
+      progress.data.settings.accountMode == AccountMode.undecided;
+
+  /// The player chose to play without an account.
+  Future<void> continueAsGuest() async {
+    final first = needsWelcome;
+    await progress.updateSettings((s) => s.accountMode = AccountMode.guest);
+    analytics.accountChoice('guest');
+    if (first) unawaited(ads.initialize());
+  }
+
+  /// Returns false if the player cancelled. Throws if sign-in fails; the
+  /// player then stays as they were.
+  Future<bool> signInWithGoogle() async {
+    final first = needsWelcome;
+    final linked = await cloud.linkGoogle();
+    if (!linked) return false;
+    await progress.updateSettings((s) => s.accountMode = AccountMode.google);
+    analytics.accountChoice('google');
+    if (first) unawaited(ads.initialize());
+    return true;
+  }
+
+  Future<void> signOut() async {
+    await cloud.signOut();
+    await progress.updateSettings((s) => s.accountMode = AccountMode.guest);
+    analytics.signedOut();
+  }
+
+  Future<void> deleteCloudData() async {
+    await cloud.deleteCloudData();
+    await progress.updateSettings((s) => s.accountMode = AccountMode.guest);
+    analytics.cloudDeleted();
   }
 
   void _syncSettings() {

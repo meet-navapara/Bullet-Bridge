@@ -10,9 +10,9 @@ every submission.
 - [ ] Decide whether to rename the Dart package (`orbit_blast`) before release
 - [ ] `version:` bumped in `pubspec.yaml` (`1.0.0+1` → name+build number)
 - [ ] Upload keystore created, `android/key.properties` present, backed up
-- [ ] AdMob app IDs and unit IDs configured (or ads deliberately disabled)
-- [ ] Privacy policy hosted; URLs passed via `--dart-define`
-- [ ] Bracketed placeholders in `legal_screen.dart` filled in
+- [ ] AdMob IDs in `release.json` (or `ADS_DISABLED` set deliberately)
+- [ ] Contact email added to `website/privacy.html` and `release.json`; site
+      deployed
 
 ## Quality
 
@@ -29,15 +29,23 @@ every submission.
 
 ## Google Play Console
 
-- [ ] `flutter build appbundle --release` (+ dart-defines) uploaded to
-      internal testing first
-- [ ] Data safety form (with ads):
-  - Data collected by the AdMob SDK: device or other IDs (advertising ID),
-    approximate location (from IP), app interactions / diagnostics,
-    used for advertising and analytics; shared with Google
-  - Data encrypted in transit: yes (SDK); users can request deletion: no
-    server data held by you
-  - The game itself stores progress only on the device
+- [ ] `flutter build appbundle --release --dart-define-from-file=release.json`
+      uploaded to internal testing first
+- [ ] Data safety form:
+  - Device or other IDs (advertising ID, app-instance ID): collected, for
+    advertising, analytics and fraud prevention
+  - Approximate location (from IP, via AdMob): collected, for advertising
+  - App activity (screens, button taps, gameplay events, ad interactions):
+    collected, for analytics and advertising; users can opt out
+  - Crash logs and diagnostics: collected, for analytics
+  - User IDs, email address and name: collected only with "Continue with
+    Google" (optional), for account management
+  - Game progress: collected only with "Continue with Google", stored in
+    Firestore, for app functionality; guests upload none
+  - Encrypted in transit: yes. Users can request deletion: yes, with the
+    `/delete-account` URL
+  - Check the sharing answers against Google's current AdMob and Firebase
+    data-disclosure pages
 - [ ] "Contains ads": **Yes**
 - [ ] Advertising ID declaration: Yes (AdMob uses it) — the
       `AD_ID` permission is merged from the SDK

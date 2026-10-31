@@ -2,7 +2,7 @@
 
 All numbers live in `lib/config/balance.dart`.
 
-> **The 100-level campaign, speed and bosses are documented in
+> **The 1000-level campaign, speed and bosses are documented in
 > [LEVEL_BALANCING.md](LEVEL_BALANCING.md)**, which supersedes the old
 > "Campaign (World 1)" and "Prism Colossus" sections below. Those sections
 > are kept as a record of the 10-stage version. This file remains current

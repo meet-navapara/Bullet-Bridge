@@ -4,7 +4,9 @@ import 'dart:ui';
 import 'package:flame/game.dart';
 
 import '../config/balance.dart';
+import '../config/level_animation.dart';
 import '../economy/catalog.dart';
+import '../render/ambient_art.dart';
 import '../render/ball_art.dart';
 import '../render/cannon_art.dart';
 import '../render/crystal_art.dart';
@@ -93,6 +95,12 @@ class BoomforgeGame extends FlameGame {
 
   final Paint _paint = Paint();
   final Paint _shieldPaint = Paint();
+
+  /// Campaign levels animate their sky; Endless and the daily challenge don't.
+  late final LevelAnimation? _levelAnimation = switch (setup.plan) {
+    final StagePlan plan => plan.level.animation,
+    _ => null,
+  };
 
   bool get isRunFinished => _sim?.isFinished ?? false;
 
@@ -540,6 +548,11 @@ class BoomforgeGame extends FlameGame {
           audio.play(Sfx.explode);
           audio.play(Sfx.roar, volume: 0.6);
           haptics.trigger(Haptic.heavy);
+        case BossThrew(:final x, :final y):
+          effects
+            ..ring(x, y, 34, const Color(0xFFFFE9A8), life: 0.3, width: 4)
+            ..burst(x, y, const Color(0xFFFFD06B), count: 6, speed: 170);
+          audio.play(Sfx.wave, volume: 0.35);
         case BossShielded(:final x, :final y):
           effects
             ..ring(x, y, 26, Palette.cyan, life: 0.25, width: 3)
@@ -587,20 +600,9 @@ class BoomforgeGame extends FlameGame {
               size: 18,
             );
           haptics.trigger(Haptic.medium);
-        case WeakPointChanged(:final x, :final y, :final open):
-          if (open) {
-            effects
-              ..ring(x, y, 120, const Color(0xFFFFF27A), life: 0.5, width: 5)
-              ..floatText(x, y + 60, 'WEAK POINT!', Palette.yellow, size: 18);
-            audio.play(Sfx.powerup, volume: 0.6);
-          }
         case BossPulled(:final x, :final y):
           effects.ring(x, y, 200, const Color(0xFF8A9BFF), life: 0.7, width: 5);
           audio.play(Sfx.wave, volume: 0.6);
-        case BossHeadRegrown(:final x, :final y):
-          effects
-            ..ring(x, y, 50, Palette.green, life: 0.5)
-            ..floatText(x, y - 40, 'REGROWN!', Palette.green);
         case TreasureEscaped(:final x, :final y):
           effects.floatText(
             x.clamp(40, sim.width - 40),
@@ -619,7 +621,6 @@ class BoomforgeGame extends FlameGame {
   static String _phaseHint(Boss? b) {
     if (b == null) return '';
     final attacks = b.phaseDef.attacks;
-    if (b.hasWeakWindows) return 'Strike when the rift opens!';
     if (attacks.contains(BossAttack.freeze)) return 'Mind the frozen ground!';
     if (attacks.contains(BossAttack.lava)) return 'The floor is lava!';
     if (attacks.contains(BossAttack.zap)) return 'Lightning incoming!';
@@ -714,6 +715,16 @@ class BoomforgeGame extends FlameGame {
         pic.draw(canvas, dx - span);
       }
       pic.draw(canvas, dx);
+    }
+    final animation = _levelAnimation;
+    if (animation != null) {
+      final screen = Size(size.x, size.y);
+      final groundTop =
+          _origin.dy + (_arenaHeight - Physics.floorHeight) * _scale;
+      AmbientArt.paintMood(canvas, screen, groundTop, animation);
+      if (!effects.reducedMotion) {
+        AmbientArt.paint(canvas, screen, groundTop, animation, theme, _time);
+      }
     }
     _ground?.draw(canvas, 0);
   }

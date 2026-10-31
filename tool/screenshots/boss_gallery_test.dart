@@ -13,7 +13,6 @@ import 'package:orbit_blast/economy/catalog.dart';
 import 'package:orbit_blast/economy/upgrades.dart';
 import 'package:orbit_blast/game/boomforge_game.dart';
 import 'package:orbit_blast/game/hud_model.dart';
-import 'package:orbit_blast/game/sim/boss.dart';
 import 'package:orbit_blast/game/sim/entities.dart';
 import 'package:orbit_blast/game/sim/wave_director.dart';
 import 'package:orbit_blast/services/audio_service.dart';
@@ -97,7 +96,6 @@ void main() {
         }
         if (def.phases.any((p) => p.weakWindows)) {
           boss.phase = def.phases.indexWhere((p) => p.weakWindows) + 1;
-          boss.weak = WeakState.open;
         }
         await save(game, '${level}_${def.id.name}');
         game.onRemove();
