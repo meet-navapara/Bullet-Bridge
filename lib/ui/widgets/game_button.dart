@@ -16,52 +16,54 @@ class _ToneColors {
 }
 
 const _tones = {
+  // Molten gold: the primary action.
   ButtonTone.yellow: _ToneColors(
-    Color(0xFFFFE66B),
-    Color(0xFFFFB81C),
-    Color(0xFFC77700),
-    Color(0xFF3B2300),
+    Color(0xFFFFE27E),
+    Color(0xFFFFA935),
+    Color(0xFFB8611A),
+    Color(0xFF3A1C00),
   ),
   ButtonTone.green: _ToneColors(
-    Color(0xFF6BF08C),
-    Color(0xFF22B84E),
-    Color(0xFF137A33),
+    Color(0xFF63F0AE),
+    Color(0xFF17B46A),
+    Color(0xFF0C7244),
     Colors.white,
   ),
   ButtonTone.blue: _ToneColors(
-    Color(0xFF5AB2FF),
-    Color(0xFF2569F0),
-    Color(0xFF15409E),
+    Color(0xFF76A6FF),
+    Color(0xFF3A5FEF),
+    Color(0xFF213AA4),
     Colors.white,
   ),
+  // Iron: secondary actions.
   ButtonTone.navy: _ToneColors(
-    Color(0xFF2A3B85),
-    Color(0xFF1A2766),
-    Color(0xFF0D1440),
+    Color(0xFF353F74),
+    Color(0xFF232A55),
+    Color(0xFF13183A),
     Colors.white,
   ),
   ButtonTone.red: _ToneColors(
-    Color(0xFFFF7A7E),
-    Color(0xFFE5394B),
-    Color(0xFF931B2A),
+    Color(0xFFFF858B),
+    Color(0xFFE53D57),
+    Color(0xFF981D33),
     Colors.white,
   ),
   ButtonTone.purple: _ToneColors(
-    Color(0xFFC690FF),
-    Color(0xFF8A3DF0),
-    Color(0xFF5420A3),
+    Color(0xFFC79BFF),
+    Color(0xFF834DF0),
+    Color(0xFF5025A5),
     Colors.white,
   ),
   ButtonTone.white: _ToneColors(
     Color(0xFFFFFFFF),
-    Color(0xFFE9ECF4),
-    Color(0xFFB4BACB),
-    Color(0xFF1F1F1F),
+    Color(0xFFE2E6F4),
+    Color(0xFFA7AECB),
+    Color(0xFF1A1F3A),
   ),
 };
 
-/// Chunky glossy arcade button with a pressed state, click sound and
-/// haptic tick. Disabled when [onPressed] is null.
+/// Rounded, softly bevelled forge button with a pressed state, click sound
+/// and haptic tick. Disabled when [onPressed] is null.
 class GameButton extends StatefulWidget {
   const GameButton({
     super.key,
@@ -112,9 +114,10 @@ class _GameButtonState extends State<GameButton> {
   Widget build(BuildContext context) {
     final enabled = widget.onPressed != null;
     final c = _tones[widget.tone]!;
-    const lip = 5.0;
+    const lip = 4.0;
     final pressed = _down && enabled;
-    final radius = BorderRadius.circular(widget.height * 0.32);
+    final radius = BorderRadius.circular(widget.height * 0.3);
+    final dark = c.text != Colors.white;
     // Long labels (prices!) scale down instead of being cut off.
     final label = FittedBox(
       fit: BoxFit.scaleDown,
@@ -123,10 +126,12 @@ class _GameButtonState extends State<GameButton> {
         maxLines: 1,
         style: TextStyles.button.copyWith(
           color: c.text,
-          fontSize: widget.fontSize ?? widget.height * 0.4,
-          shadows: c.text == Colors.white
-              ? TextStyles.button.shadows
-              : const [],
+          fontSize: widget.fontSize ?? widget.height * 0.34,
+          shadows: dark
+              ? const [Shadow(color: Color(0x66FFFFFF), offset: Offset(0, 1))]
+              : const [
+                  Shadow(color: Color(0x99000000), offset: Offset(0, 1.5)),
+                ],
         ),
       ),
     );
@@ -139,84 +144,102 @@ class _GameButtonState extends State<GameButton> {
         onTapCancel: () => setState(() => _down = false),
         onTapUp: (_) => setState(() => _down = false),
         onTap: enabled ? _tap : null,
-        child: Opacity(
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 150),
           opacity: enabled ? 1 : 0.45,
-          child: SizedBox(
-            height: widget.height + lip,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  top: lip,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: c.lip,
-                      borderRadius: radius,
-                      border: Border.all(color: Palette.outline, width: 3),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x55000000),
-                          offset: Offset(0, 4),
-                        ),
-                      ],
+          child: AnimatedScale(
+            duration: const Duration(milliseconds: 90),
+            scale: pressed ? 0.97 : 1,
+            child: SizedBox(
+              height: widget.height + lip,
+              child: Stack(
+                children: [
+                  // Lip: the darker underside that gives the button depth.
+                  Positioned.fill(
+                    top: lip,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: c.lip,
+                        borderRadius: radius,
+                        boxShadow: enabled && widget.tone != ButtonTone.navy
+                            ? Elevation.glow(c.bottom, strength: 0.4)
+                            : Elevation.control,
+                      ),
                     ),
                   ),
-                ),
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 60),
-                  left: 0,
-                  right: 0,
-                  top: pressed ? lip - 1 : 0,
-                  height: widget.height,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: radius,
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [c.top, c.bottom],
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 70),
+                    left: 0,
+                    right: 0,
+                    top: pressed ? lip - 1 : 0,
+                    height: widget.height,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: radius,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [c.top, c.bottom],
+                        ),
+                        border: Border.all(
+                          color: Color.lerp(
+                            c.top,
+                            Colors.white,
+                            0.35,
+                          )!.withValues(alpha: 0.55),
+                          width: 1.2,
+                        ),
                       ),
-                      // Thick cartoon outline.
-                      border: Border.all(color: Palette.outline, width: 3),
-                    ),
-                    child: Stack(
-                      children: [
-                        // Gloss highlight.
-                        Positioned(
-                          left: 10,
-                          right: 10,
-                          top: 4,
-                          height: widget.height * 0.3,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(
-                                widget.height,
+                      child: Stack(
+                        children: [
+                          // Soft top sheen.
+                          Positioned(
+                            left: 1.5,
+                            right: 1.5,
+                            top: 1.5,
+                            height: widget.height * 0.46,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(widget.height * 0.28),
+                                  bottom: Radius.circular(widget.height * 0.12),
+                                ),
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.white.withValues(alpha: 0.28),
+                                    Colors.white.withValues(alpha: 0.04),
+                                  ],
+                                ),
                               ),
-                              color: Colors.white.withValues(alpha: 0.22),
                             ),
                           ),
-                        ),
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: widget.icon == null
-                                ? label
-                                : Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      widget.icon!,
-                                      if (widget.label.isNotEmpty) ...[
-                                        const SizedBox(width: 8),
-                                        Flexible(child: label),
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              child: widget.icon == null
+                                  ? label
+                                  : Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        widget.icon!,
+                                        if (widget.label.isNotEmpty) ...[
+                                          const SizedBox(width: 8),
+                                          Flexible(child: label),
+                                        ],
                                       ],
-                                    ],
-                                  ),
+                                    ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -228,8 +251,8 @@ class _GameButtonState extends State<GameButton> {
   }
 }
 
-/// Round icon button used for back/pause/settings.
-class RoundIconButton extends StatelessWidget {
+/// Glassy iron squircle icon button used for back/pause/settings.
+class RoundIconButton extends StatefulWidget {
   const RoundIconButton({
     super.key,
     required this.icon,
@@ -244,42 +267,55 @@ class RoundIconButton extends StatelessWidget {
   final String? tooltip;
 
   @override
+  State<RoundIconButton> createState() => _RoundIconButtonState();
+}
+
+class _RoundIconButtonState extends State<RoundIconButton> {
+  bool _down = false;
+
+  @override
   Widget build(BuildContext context) {
+    final size = widget.size;
     return Semantics(
       button: true,
-      label: tooltip,
+      label: widget.tooltip,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _down = true),
+        onTapCancel: () => setState(() => _down = false),
+        onTapUp: (_) => setState(() => _down = false),
         onTap: () {
           final services = AppScope.of(context);
           services.audio.play(Sfx.click);
           services.haptics.trigger(Haptic.selection);
-          final name = tooltip;
+          final name = widget.tooltip;
           if (name != null) services.analytics.buttonTap(name);
-          onPressed();
+          widget.onPressed();
         },
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(size * 0.32),
-            gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF5AB2FF), Color(0xFF2569F0)],
+        child: AnimatedScale(
+          duration: const Duration(milliseconds: 90),
+          scale: _down ? 0.92 : 1,
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(size * 0.34),
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xE6363F78), Color(0xE61D2349)],
+              ),
+              border: Border.all(color: const Color(0x40FFFFFF), width: 1.2),
+              boxShadow: Elevation.control,
             ),
-            border: Border.all(color: Palette.outline, width: 3),
-            boxShadow: const [
-              BoxShadow(color: Color(0x55000000), offset: Offset(0, 4)),
-            ],
-          ),
-          child: Icon(
-            icon,
-            color: Colors.white,
-            size: size * 0.55,
-            shadows: const [
-              Shadow(color: Palette.outline, offset: Offset(0, 2)),
-            ],
+            child: Icon(
+              widget.icon,
+              color: Colors.white,
+              size: size * 0.52,
+              shadows: const [
+                Shadow(color: Color(0x99000000), offset: Offset(0, 1.5)),
+              ],
+            ),
           ),
         ),
       ),

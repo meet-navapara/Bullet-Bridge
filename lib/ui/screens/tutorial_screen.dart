@@ -118,7 +118,13 @@ class _TutorialScreenState extends State<TutorialScreen> {
             Icons.upgrade_rounded,
             color: Palette.green,
             size: 80,
-            shadows: [Shadow(color: Palette.outline, offset: Offset(0, 3))],
+            shadows: [
+              Shadow(
+                color: Color(0x99000000),
+                offset: Offset(0, 3),
+                blurRadius: 6,
+              ),
+            ],
           ),
         ],
       ),
@@ -202,11 +208,9 @@ class _TutorialScreenState extends State<TutorialScreen> {
                   height: 10,
                   margin: const EdgeInsets.symmetric(horizontal: 3),
                   decoration: BoxDecoration(
-                    color: i == _page
-                        ? Palette.yellow
-                        : const Color(0x88FFFFFF),
+                    color: i == _page ? Palette.gold : const Color(0x88FFFFFF),
                     borderRadius: BorderRadius.circular(5),
-                    border: Border.all(color: Palette.outline, width: 2),
+                    border: Border.all(color: const Color(0x33FFFFFF)),
                   ),
                 ),
             ],
@@ -280,7 +284,11 @@ class _DragArtState extends State<_DragArt>
                   color: Colors.white,
                   size: 56,
                   shadows: [
-                    Shadow(color: Palette.outline, offset: Offset(0, 3)),
+                    Shadow(
+                      color: Color(0x99000000),
+                      offset: Offset(0, 3),
+                      blurRadius: 6,
+                    ),
                   ],
                 ),
               ),
@@ -295,7 +303,11 @@ class _DragArtState extends State<_DragArt>
                   color: Colors.white,
                   size: 52,
                   shadows: [
-                    Shadow(color: Palette.outline, offset: Offset(0, 3)),
+                    Shadow(
+                      color: Color(0x99000000),
+                      offset: Offset(0, 3),
+                      blurRadius: 6,
+                    ),
                   ],
                 ),
               ),

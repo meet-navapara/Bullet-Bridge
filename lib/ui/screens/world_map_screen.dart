@@ -229,10 +229,11 @@ class _ChapterBanner extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(Radii.lg),
-          border: Border.all(color: Palette.outline, width: 3.5),
-          boxShadow: const [
-            BoxShadow(color: Color(0x55000000), offset: Offset(0, 5)),
-          ],
+          border: Border.all(
+            color: Palette.brass.withValues(alpha: 0.6),
+            width: 1.5,
+          ),
+          boxShadow: Elevation.panel,
         ),
         clipBehavior: Clip.antiAlias,
         child: Stack(
@@ -331,17 +332,20 @@ class _PathPainter extends CustomPainter {
         path,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 14
+          ..strokeWidth = 10
           ..strokeCap = StrokeCap.round
-          ..color = Palette.outline,
+          ..color = const Color(0xB30A0D1F),
       );
       canvas.drawPath(
         path,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 8
+          ..strokeWidth = 4
           ..strokeCap = StrokeCap.round
-          ..color = done ? Palette.yellow : const Color(0xFF8C97B8),
+          ..color = done ? Palette.gold : const Color(0x66FFFFFF)
+          ..maskFilter = done
+              ? const MaskFilter.blur(BlurStyle.solid, 2)
+              : null,
       );
     }
   }
@@ -376,14 +380,20 @@ class _StageNode extends StatelessWidget {
         level.category == LevelCategory.intro;
     final size = boss ? 74.0 : 62.0;
     final colors = !unlocked
-        ? const [Color(0xFF8C97B8), Color(0xFF5A6384)]
+        ? const [Color(0xFF4A5280), Color(0xFF262C52)]
         : boss
-        ? const [Color(0xFFFF8A8A), Color(0xFFD62B45)]
+        ? const [Color(0xFFFF8A86), Color(0xFFC21F3E)]
         : stars > 0
-        ? const [Color(0xFF7CF0A0), Color(0xFF22B84E)]
+        ? const [Color(0xFFFFDC7A), Color(0xFFE2761E)]
         : recovery
-        ? const [Color(0xFF8FE3FF), Color(0xFF2E9CD6)]
-        : const [Color(0xFFFFE66B), Color(0xFFFFB81C)];
+        ? const [Color(0xFF8FE3FF), Color(0xFF2E7CD6)]
+        : const [Color(0xFF7FF0DA), Color(0xFF14998A)];
+    // Hexagonal forge sockets, rimmed in light.
+    ShapeBorder hex(Color rim, double width) => StarBorder.polygon(
+      sides: 6,
+      pointRounding: 0.3,
+      side: BorderSide(color: rim, width: width),
+    );
     final number = level.number;
     return Semantics(
       button: true,
@@ -403,15 +413,14 @@ class _StageNode extends StatelessWidget {
               children: [
                 if (current)
                   Container(
-                    width: size + 16,
-                    height: size + 16,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
+                    width: size + 20,
+                    height: size + 20,
+                    decoration: ShapeDecoration(
+                      shape: hex(Palette.gold, 2.5),
+                      shadows: [
                         BoxShadow(
-                          color: Palette.yellow.withValues(alpha: 0.8),
+                          color: Palette.ember.withValues(alpha: 0.7),
                           blurRadius: 18,
-                          spreadRadius: 2,
                         ),
                       ],
                     ),
@@ -419,17 +428,17 @@ class _StageNode extends StatelessWidget {
                 Container(
                   width: size,
                   height: size,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                  decoration: ShapeDecoration(
+                    shape: hex(
+                      Color.lerp(colors.first, Colors.white, 0.4)!,
+                      1.5,
+                    ),
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: colors,
                     ),
-                    border: Border.all(color: Palette.outline, width: 3.5),
-                    boxShadow: const [
-                      BoxShadow(color: Color(0x55000000), offset: Offset(0, 4)),
-                    ],
+                    shadows: Elevation.control,
                   ),
                   alignment: Alignment.center,
                   child: unlocked
@@ -437,13 +446,8 @@ class _StageNode extends StatelessWidget {
                             ? const Icon(
                                 Icons.diamond_rounded,
                                 color: Colors.white,
-                                size: 38,
-                                shadows: [
-                                  Shadow(
-                                    color: Palette.outline,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
+                                size: 36,
+                                shadows: TextStyles.outlined,
                               )
                             : FittedBox(
                                 child: Padding(
@@ -451,7 +455,7 @@ class _StageNode extends StatelessWidget {
                                   child: Text(
                                     '$number',
                                     style: TextStyles.title.copyWith(
-                                      fontSize: 26,
+                                      fontSize: 22,
                                     ),
                                   ),
                                 ),
@@ -493,9 +497,9 @@ class _StageNode extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
               decoration: BoxDecoration(
-                color: const Color(0xE6203152),
+                color: const Color(0xD9121733),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Palette.outline, width: 2),
+                border: Border.all(color: const Color(0x33FFFFFF)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -504,9 +508,7 @@ class _StageNode extends StatelessWidget {
                     Icon(
                       Icons.star_rounded,
                       size: 16,
-                      color: i < stars
-                          ? Palette.yellow
-                          : const Color(0x55FFFFFF),
+                      color: i < stars ? Palette.gold : const Color(0x40FFFFFF),
                     ),
                 ],
               ),
@@ -531,8 +533,9 @@ class _Badge extends StatelessWidget {
       height: 32,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFF203152),
-        border: Border.all(color: Palette.outline, width: 2.5),
+        color: const Color(0xF0181D3D),
+        border: Border.all(color: const Color(0x4DFFFFFF), width: 1.2),
+        boxShadow: Elevation.control,
       ),
       alignment: Alignment.center,
       child: child,

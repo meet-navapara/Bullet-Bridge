@@ -279,7 +279,9 @@ class CrystalArt {
     double dy = 0,
     Color color = const Color(0xFFFFFFFF),
   }) {
-    final fontSize = (size * 2).roundToDouble() / 2;
+    // The display face runs wide, so labels are set a little smaller than
+    // [size] to stay inside the crystal.
+    final fontSize = (size * 0.84 * 2).roundToDouble() / 2;
     final key = '$text@$fontSize@${color.toARGB32()}';
     if (_labels.length > 500) _labels.clear();
     final painters = _labels.putIfAbsent(key, () {
@@ -300,7 +302,7 @@ class CrystalArt {
         make(
           Paint()
             ..style = PaintingStyle.stroke
-            ..strokeWidth = math.max(2, fontSize * 0.2)
+            ..strokeWidth = math.max(2, fontSize * 0.17)
             ..strokeJoin = StrokeJoin.round
             ..color = _outline,
         ),
@@ -314,9 +316,10 @@ class CrystalArt {
   }
 
   static double labelScale(String text) => switch (text.length) {
-    1 || 2 => 1.0,
-    3 => 0.82,
-    _ => 0.66,
+    1 => 1.0,
+    2 => 0.86,
+    3 => 0.7,
+    _ => 0.58,
   };
 
   // --------------------------------------------------------------- shards
@@ -571,7 +574,7 @@ class CrystalArt {
     c.scale(0.8 + 0.2 * pulse);
     _glow(c, r * 2.6, color, 0.5);
     c.restore();
-    // Floating rock islet with a grass top.
+    // Floating basalt socket with a brass collar.
     final rock = Path()
       ..moveTo(-r * 1.3, r * 0.15)
       ..lineTo(r * 1.3, r * 0.15)
@@ -579,19 +582,19 @@ class CrystalArt {
       ..lineTo(r * 0.15, r * 1.35)
       ..lineTo(-r * 0.45, r * 0.85)
       ..close();
-    _fill.color = const Color(0xFF7A5E4A);
+    _fill.color = const Color(0xFF4A4466);
     c.drawPath(rock, _fill);
     _stroke
       ..color = _outline
       ..strokeWidth = 2;
     c.drawPath(rock, _stroke);
-    final grass = RRect.fromRectAndRadius(
+    final collar = RRect.fromRectAndRadius(
       Rect.fromLTRB(-r * 1.38, -r * 0.05, r * 1.38, r * 0.3),
       Radius.circular(r * 0.15),
     );
-    _fill.color = const Color(0xFF5CC94A);
-    c.drawRRect(grass, _fill);
-    c.drawRRect(grass, _stroke);
+    _fill.color = const Color(0xFFE2B15C);
+    c.drawRRect(collar, _fill);
+    c.drawRRect(collar, _stroke);
     // Crystal cluster.
     for (final (dx, h, tilt) in const [
       (-0.55, 1.2, -0.35),

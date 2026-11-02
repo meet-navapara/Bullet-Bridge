@@ -89,9 +89,9 @@ class BallArt {
 
   void _drawLabel(Canvas canvas, String label, double radius) {
     final factor = switch (label.length) {
-      1 || 2 => 0.95,
-      3 => 0.78,
-      _ => 0.62,
+      1 || 2 => 0.8,
+      3 => 0.66,
+      _ => 0.52,
     };
     final fontSize = (radius * factor * 2).roundToDouble() / 2;
     final key = '$label@$fontSize';

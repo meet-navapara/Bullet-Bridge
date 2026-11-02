@@ -78,7 +78,7 @@ void _clearArena(GameSimulation sim) {
 
 void main() {
   setUpAll(() async {
-    await _loadFont('LilitaOne', ['assets/fonts/LilitaOne-Regular.ttf']);
+    await _loadFont('RussoOne', ['assets/fonts/RussoOne-Regular.ttf']);
     await _loadFont('Roboto', [
       '$_sdkFonts/roboto-regular.ttf',
       '$_sdkFonts/roboto-medium.ttf',

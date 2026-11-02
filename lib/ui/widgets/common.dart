@@ -7,8 +7,8 @@ import '../theme/palette.dart';
 import 'art.dart';
 import 'game_button.dart';
 
-/// Chunky cartoon panel: slate blue (or warm wood) with a thick dark
-/// outline, an inner highlight and a hard drop shadow.
+/// Iron-glass panel: a cool gradient, a light rim, a soft top sheen and a
+/// deep soft shadow. [wood] gives the warm forge variant with a brass rim.
 class GamePanel extends StatelessWidget {
   const GamePanel({
     super.key,
@@ -27,38 +27,67 @@ class GamePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final top = wood ? Palette.woodLight : Palette.panelLight;
     final bottom = wood ? Palette.wood : Palette.panel;
+    final rim =
+        highlight ??
+        (wood
+            ? Palette.brass.withValues(alpha: 0.55)
+            : Palette.panelBorder.withValues(alpha: 0.8));
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(Radii.lg),
-        color: Palette.outline,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [top.withValues(alpha: 0.97), bottom.withValues(alpha: 0.97)],
+        ),
+        border: Border.all(color: rim, width: highlight == null ? 1.2 : 2),
         boxShadow: [
-          const BoxShadow(color: Color(0x55000000), offset: Offset(0, 5)),
+          ...Elevation.panel,
           if (highlight != null)
-            BoxShadow(color: highlight!.withValues(alpha: 0.6), blurRadius: 14),
+            BoxShadow(
+              color: highlight!.withValues(alpha: 0.35),
+              blurRadius: 22,
+              spreadRadius: -2,
+            ),
         ],
       ),
-      padding: EdgeInsets.all(highlight == null ? 3 : 3.5),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(Radii.lg - 3),
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [top, bottom],
-          ),
-          border: Border.all(
-            color: highlight ?? Colors.white.withValues(alpha: 0.18),
-            width: highlight == null ? 1.5 : 3,
-          ),
+      foregroundDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(Radii.lg),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: const Alignment(0, -0.55),
+          colors: [
+            Colors.white.withValues(alpha: 0.07),
+            Colors.white.withValues(alpha: 0),
+          ],
         ),
-        padding: padding,
-        child: child,
       ),
+      padding: padding,
+      child: child,
     );
   }
 }
 
-/// Dark slanted chip used in HUDs (coins, score).
+/// Brass-to-ember fill shared by every UI icon.
+class ForgeIcon extends StatelessWidget {
+  const ForgeIcon(this.icon, {super.key, this.size = 26});
+  final IconData icon;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => ShaderMask(
+    blendMode: BlendMode.srcIn,
+    shaderCallback: (r) => const LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [Color(0xFFFFE7A6), Color(0xFFFFB443), Color(0xFFFF7A2B)],
+    ).createShader(r),
+    child: Icon(icon, size: size, color: Colors.white),
+  );
+}
+
+/// Glass pill used in HUDs (coins, score), with its icon overlapping the
+/// left end.
 class HudChip extends StatelessWidget {
   const HudChip({
     super.key,
@@ -79,42 +108,48 @@ class HudChip extends StatelessWidget {
         alignment: Alignment.centerLeft,
         children: [
           Padding(
-            padding: const EdgeInsets.only(left: 16),
-            child: Transform(
-              transform: Matrix4.skewX(-0.18),
-              child: Container(
-                height: 30,
-                padding: EdgeInsets.only(
-                  left: 22,
-                  right: onAdd == null ? 14 : 34,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xE6203152),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Palette.outline, width: 2.5),
-                ),
-                alignment: Alignment.center,
-                child: Transform(transform: Matrix4.skewX(0.18), child: child),
+            padding: const EdgeInsets.only(left: 14),
+            child: Container(
+              height: 32,
+              padding: EdgeInsets.only(
+                left: 26,
+                right: onAdd == null ? 14 : 36,
               ),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xD9262E5A), Color(0xD9121733)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0x33FFFFFF)),
+                boxShadow: Elevation.control,
+              ),
+              alignment: Alignment.center,
+              child: child,
             ),
           ),
           icon,
           if (onAdd != null)
             Positioned(
-              right: 0,
+              right: 3,
               child: GestureDetector(
                 onTap: onAdd,
                 child: Container(
-                  width: 28,
-                  height: 28,
+                  width: 26,
+                  height: 26,
                   decoration: BoxDecoration(
-                    color: Palette.green,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Palette.outline, width: 2.5),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0xFF63F0AE), Color(0xFF17B46A)],
+                    ),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(color: const Color(0x66FFFFFF)),
                   ),
                   child: const Icon(
                     Icons.add_rounded,
-                    size: 20,
+                    size: 19,
                     color: Colors.white,
                   ),
                 ),
@@ -126,7 +161,8 @@ class HudChip extends StatelessWidget {
   }
 }
 
-/// Coin total chip. Rebuilds only when coins change.
+/// Coin total chip. Rebuilds only when coins change, and rolls to the new
+/// total instead of jumping.
 class CoinBadge extends StatelessWidget {
   const CoinBadge({super.key, this.onAdd});
   final VoidCallback? onAdd;
@@ -139,17 +175,35 @@ class CoinBadge extends StatelessWidget {
       builder: (context, _) => HudChip(
         icon: const CoinIcon(size: 34),
         onAdd: onAdd,
-        child: Text(
-          formatInt(progress.data.coins),
-          style: TextStyles.number.copyWith(fontSize: 18),
+        child: RollingNumber(
+          value: progress.data.coins,
+          style: TextStyles.number.copyWith(fontSize: 16),
         ),
       ),
     );
   }
 }
 
-/// The BOOMFORGE logo: tilted, gradient-filled arcade lettering with a
-/// thick outline and a ribbon tagline.
+/// An integer that counts to its new value when it changes.
+class RollingNumber extends StatelessWidget {
+  const RollingNumber({super.key, required this.value, required this.style});
+  final int value;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(end: value.toDouble()),
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+      builder: (context, v, _) => Text(formatInt(v.round()), style: style),
+    );
+  }
+}
+
+/// The BOOMFORGE wordmark: "BOOM" in molten metal, "FORGE" in brushed
+/// steel, set straight on an ink stroke, with the tagline between two ember
+/// rules.
 class GameLogo extends StatelessWidget {
   const GameLogo({super.key, this.size = 64});
   final double size;
@@ -160,7 +214,7 @@ class GameLogo extends StatelessWidget {
       fontFamily: TextStyles.display,
       fontSize: size,
       height: 1,
-      letterSpacing: 1,
+      letterSpacing: size * 0.02,
     );
     Widget word(String text, List<Color> colors) => Stack(
       children: [
@@ -169,14 +223,14 @@ class GameLogo extends StatelessWidget {
           style: style.copyWith(
             foreground: Paint()
               ..style = PaintingStyle.stroke
-              ..strokeWidth = size * 0.2
+              ..strokeWidth = size * 0.16
               ..strokeJoin = StrokeJoin.round
               ..color = Palette.outline,
-            shadows: const [
+            shadows: [
               Shadow(
-                color: Color(0x88000000),
-                offset: Offset(0, 6),
-                blurRadius: 4,
+                color: const Color(0x99000000),
+                offset: Offset(0, size * 0.08),
+                blurRadius: size * 0.12,
               ),
             ],
           ),
@@ -186,6 +240,7 @@ class GameLogo extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: colors,
+            stops: const [0, 0.48, 0.52, 1],
           ).createShader(rect),
           child: Text(text, style: style.copyWith(color: Colors.white)),
         ),
@@ -200,34 +255,30 @@ class GameLogo extends StatelessWidget {
       child: ExcludeSemantics(
         child: FittedBox(
           fit: BoxFit.scaleDown,
-          child: Transform.rotate(
-            angle: -0.05,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // "BOOM" hot, "FORGE" steel blue.
-                    word(title.substring(0, split), const [
-                      Color(0xFFFFF59A),
-                      Color(0xFFFFB627),
-                      Color(0xFFFF5A1F),
-                    ]),
-                    word(title.substring(split), const [
-                      Color(0xFFFFFFFF),
-                      Color(0xFF9FD8FF),
-                      Color(0xFF2F7BFF),
-                    ]),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                _Ribbon(
-                  text: AppConfig.tagline.toUpperCase(),
-                  size: size * 0.24,
-                ),
-              ],
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // A hard split in each gradient reads as a polished bevel.
+                  word(title.substring(0, split), const [
+                    Color(0xFFFFF3B8),
+                    Color(0xFFFFC245),
+                    Color(0xFFFF9A2E),
+                    Color(0xFFE2471A),
+                  ]),
+                  word(title.substring(split), const [
+                    Color(0xFFFFFFFF),
+                    Color(0xFFD5DDF2),
+                    Color(0xFFA6B2D6),
+                    Color(0xFF6874A3),
+                  ]),
+                ],
+              ),
+              SizedBox(height: size * 0.14),
+              _Tagline(text: AppConfig.tagline.toUpperCase(), size: size * 0.2),
+            ],
           ),
         ),
       ),
@@ -235,35 +286,45 @@ class GameLogo extends StatelessWidget {
   }
 }
 
-class _Ribbon extends StatelessWidget {
-  const _Ribbon({required this.text, required this.size});
+class _Tagline extends StatelessWidget {
+  const _Tagline({required this.text, required this.size});
   final String text;
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: size * 1.2,
-        vertical: size * 0.25,
-      ),
+    Widget rule(bool left) => Container(
+      width: size * 3,
+      height: 2,
       decoration: BoxDecoration(
-        color: Palette.coral,
-        borderRadius: BorderRadius.circular(size * 0.4),
-        border: Border.all(color: Palette.outline, width: 3),
-        boxShadow: const [
-          BoxShadow(color: Color(0x55000000), offset: Offset(0, 3)),
-        ],
+        gradient: LinearGradient(
+          colors: left
+              ? [Palette.ember.withValues(alpha: 0), Palette.ember]
+              : [Palette.ember, Palette.ember.withValues(alpha: 0)],
+        ),
       ),
-      child: Text(
-        text,
-        style: TextStyles.button.copyWith(fontSize: size, letterSpacing: 2),
-      ),
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        rule(true),
+        SizedBox(width: size * 0.6),
+        Text(
+          text,
+          style: TextStyles.button.copyWith(
+            fontSize: size,
+            letterSpacing: size * 0.35,
+            color: const Color(0xFFFFE2B8),
+          ),
+        ),
+        SizedBox(width: size * 0.25),
+        rule(false),
+      ],
     );
   }
 }
 
-/// Standard screen frame: illustrated world, back button, title, coins.
+/// Standard screen frame: dimmed world, back button, title, coins.
 class ScreenShell extends StatelessWidget {
   const ScreenShell({
     super.key,
@@ -284,7 +345,7 @@ class ScreenShell extends StatelessWidget {
     return Scaffold(
       body: WorldBackground(
         theme: Catalog.theme(services.progress.data.selectedTheme),
-        dim: 0.45,
+        dim: 0.6,
         groundFraction: 0.1,
         child: SafeArea(
           child: Column(
@@ -308,7 +369,7 @@ class ScreenShell extends StatelessWidget {
                     Expanded(
                       child: Text(
                         title,
-                        style: TextStyles.title,
+                        style: TextStyles.title.copyWith(fontSize: 24),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -326,7 +387,7 @@ class ScreenShell extends StatelessWidget {
   }
 }
 
-/// Rounded progress bar with a dark outline.
+/// Rounded progress bar in a recessed well, with a glossy fill.
 class ProgressBar extends StatelessWidget {
   const ProgressBar({
     super.key,
@@ -343,27 +404,25 @@ class ProgressBar extends StatelessWidget {
     return Container(
       height: height + 4,
       decoration: BoxDecoration(
-        color: Palette.outline,
+        color: const Color(0xB30A0D1F),
         borderRadius: BorderRadius.circular(height),
+        border: Border.all(color: const Color(0x1FFFFFFF)),
       ),
       padding: const EdgeInsets.all(2),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF0D1A3A),
-          borderRadius: BorderRadius.circular(height),
-        ),
-        child: FractionallySizedBox(
-          alignment: Alignment.centerLeft,
-          widthFactor: value.clamp(0.0, 1.0),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(height),
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color.lerp(color, Colors.white, 0.35)!, color],
-              ),
+      child: FractionallySizedBox(
+        alignment: Alignment.centerLeft,
+        widthFactor: value.clamp(0.0, 1.0),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(height),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color.lerp(color, Colors.white, 0.4)!, color],
             ),
+            boxShadow: [
+              BoxShadow(color: color.withValues(alpha: 0.45), blurRadius: 6),
+            ],
           ),
         ),
       ),
@@ -371,25 +430,30 @@ class ProgressBar extends StatelessWidget {
   }
 }
 
-/// Small red notification dot.
+/// Small notification dot.
 class NotifyDot extends StatelessWidget {
   const NotifyDot({super.key, this.count});
   final int? count;
 
   @override
   Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(minWidth: 22),
-    height: 22,
+    constraints: const BoxConstraints(minWidth: 20),
+    height: 20,
     padding: const EdgeInsets.symmetric(horizontal: 5),
     decoration: BoxDecoration(
-      color: Palette.coral,
-      borderRadius: BorderRadius.circular(11),
-      border: Border.all(color: Palette.outline, width: 2.5),
+      gradient: const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFFF8A7A), Color(0xFFE8364F)],
+      ),
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: Palette.background, width: 2),
+      boxShadow: Elevation.glow(Palette.coral, strength: 0.5),
     ),
     alignment: Alignment.center,
     child: Text(
       count == null ? '!' : '$count',
-      style: TextStyles.number.copyWith(fontSize: 12, shadows: const []),
+      style: TextStyles.number.copyWith(fontSize: 11, shadows: const []),
     ),
   );
 }
@@ -398,7 +462,7 @@ class NotifyDot extends StatelessWidget {
 Route<T> gameRoute<T>(Widget page) => PageRouteBuilder<T>(
   // The name is what analytics reports for this screen.
   settings: RouteSettings(name: page.runtimeType.toString()),
-  transitionDuration: const Duration(milliseconds: 260),
+  transitionDuration: const Duration(milliseconds: 280),
   reverseTransitionDuration: const Duration(milliseconds: 200),
   pageBuilder: (_, _, _) => page,
   transitionsBuilder: (context, animation, _, child) {
@@ -410,10 +474,13 @@ Route<T> gameRoute<T>(Widget page) => PageRouteBuilder<T>(
       opacity: curved,
       child: SlideTransition(
         position: Tween(
-          begin: const Offset(0, 0.04),
+          begin: const Offset(0, 0.03),
           end: Offset.zero,
         ).animate(curved),
-        child: child,
+        child: ScaleTransition(
+          scale: Tween(begin: 0.985, end: 1.0).animate(curved),
+          child: child,
+        ),
       ),
     );
   },
@@ -434,7 +501,7 @@ void showToast(
         duration: const Duration(milliseconds: 1600),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(Radii.md),
-          side: const BorderSide(color: Palette.outline, width: 2.5),
+          side: const BorderSide(color: Color(0x40FFFFFF)),
         ),
       ),
     );
@@ -450,6 +517,7 @@ Future<bool> confirmDialog(
 }) async {
   final result = await showDialog<bool>(
     context: context,
+    barrierColor: const Color(0xA60A0D1F),
     builder: (context) => Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.all(Gaps.xl),
@@ -460,7 +528,7 @@ Future<bool> confirmDialog(
           children: [
             Text(
               title,
-              style: TextStyles.title.copyWith(fontSize: 26),
+              style: TextStyles.title.copyWith(fontSize: 23),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: Gaps.md),

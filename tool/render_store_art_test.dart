@@ -25,9 +25,8 @@ const Size graphic = Size(1024, 500);
 void main() {
   testWidgets('render store art', (tester) async {
     await tester.runAsync(() async {
-      final bytes = File('assets/fonts/LilitaOne-Regular.ttf')
-          .readAsBytesSync();
-      final loader = FontLoader('LilitaOne')
+      final bytes = File('assets/fonts/RussoOne-Regular.ttf').readAsBytesSync();
+      final loader = FontLoader('RussoOne')
         ..addFont(Future.value(ByteData.view(bytes.buffer)));
       await loader.load();
 
@@ -121,36 +120,51 @@ void _paintGraphic(Canvas c) {
     muzzleFlash: 1,
   );
 
-  // Logo, in the colours of the in-game title.
-  const left = 48.0;
-  final boom = _word(c, 'BOOM', left, 92, const [
-    Color(0xFFFFD23F),
-    Color(0xFFFF7A1A),
+  // Logo, in the colours of the in-game wordmark (see GameLogo).
+  const left = 44.0;
+  final boom = _word(c, 'BOOM', left, 110, const [
+    Color(0xFFFFF3B8),
+    Color(0xFFFFC245),
+    Color(0xFFFF9A2E),
+    Color(0xFFE2471A),
   ]);
-  _word(c, 'FORGE', left + boom + 2, 92, const [
-    Color(0xFFD6ECFF),
-    Color(0xFF3D8BFF),
+  final forge = _word(c, 'FORGE', left + boom + 2, 110, const [
+    Color(0xFFFFFFFF),
+    Color(0xFFD5DDF2),
+    Color(0xFFA6B2D6),
+    Color(0xFF6874A3),
   ]);
 
-  final ribbon = TextPainter(
+  // Tagline between two ember rules.
+  final tagline = TextPainter(
     textDirection: TextDirection.ltr,
     text: const TextSpan(
       text: 'BREAK THE WORLD',
       style: TextStyle(
-        fontFamily: 'LilitaOne',
-        fontSize: 30,
-        letterSpacing: 2,
-        color: Colors.white,
+        fontFamily: 'RussoOne',
+        fontSize: 22,
+        letterSpacing: 7,
+        color: Color(0xFFFFE2B8),
       ),
     ),
   )..layout();
-  final box = RRect.fromRectAndRadius(
-    Rect.fromLTWH(left + 6, 210, ribbon.width + 44, ribbon.height + 18),
-    const Radius.circular(8),
-  );
-  c.drawRRect(box.inflate(4), Paint()..color = const Color(0xFF1C1830));
-  c.drawRRect(box, Paint()..color = const Color(0xFFFF5A67));
-  ribbon.paint(c, Offset(left + 28, 219));
+  final width = boom + forge;
+  final tx = left + (width - tagline.width) / 2;
+  const ty = 215.0;
+  tagline.paint(c, Offset(tx, ty));
+  final ruleY = ty + tagline.height / 2;
+  for (final (a, b) in [
+    (left, tx - 14),
+    (tx + tagline.width + 6, left + width),
+  ]) {
+    c.drawLine(
+      Offset(a, ruleY),
+      Offset(b, ruleY),
+      Paint()
+        ..color = const Color(0xFFFF7A2B)
+        ..strokeWidth = 2.5,
+    );
+  }
 }
 
 /// Draws a word with a dark outline and returns its width.
@@ -159,27 +173,24 @@ double _word(Canvas c, String word, double x, double y, List<Color> colors) {
     textDirection: TextDirection.ltr,
     text: TextSpan(
       text: word,
-      style: TextStyle(
-        fontFamily: 'LilitaOne',
-        fontSize: 98,
-        foreground: paint,
-      ),
+      style: TextStyle(fontFamily: 'RussoOne', fontSize: 72, foreground: paint),
     ),
   )..layout();
 
   painter(
     Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 16
+      ..strokeWidth = 12
       ..strokeJoin = StrokeJoin.round
-      ..color = const Color(0xFF1C1830),
+      ..color = const Color(0xFF0A0D1F),
   ).paint(c, Offset(x, y));
   final fill = painter(
     Paint()
       ..shader = ui.Gradient.linear(
-        Offset(0, y + 16),
-        Offset(0, y + 100),
+        Offset(0, y + 10),
+        Offset(0, y + 76),
         colors,
+        const [0, 0.48, 0.52, 1],
       ),
   )..paint(c, Offset(x, y));
   return fill.width;

@@ -651,21 +651,25 @@ class _ScoreBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 38,
-      height: 38,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFF203152),
-        border: Border.all(color: Palette.outline, width: 2.5),
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF3A4374), Color(0xFF151A33)],
+        ),
+        border: Border.all(
+          color: Palette.brass.withValues(alpha: 0.8),
+          width: 1.5,
+        ),
+        boxShadow: Elevation.control,
       ),
       alignment: Alignment.center,
       child: Semantics(
         label: label,
-        child: const Icon(
-          Icons.auto_awesome_rounded,
-          color: Palette.yellow,
-          size: 22,
-        ),
+        child: const ForgeIcon(Icons.auto_awesome_rounded, size: 20),
       ),
     );
   }
@@ -711,8 +715,8 @@ class _BossBar extends StatelessWidget {
                   margin: const EdgeInsets.only(right: 3),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: i <= phase ? Palette.coral : const Color(0x55FFFFFF),
-                    border: Border.all(color: Palette.outline, width: 1.5),
+                    color: i <= phase ? Palette.coral : const Color(0x40FFFFFF),
+                    border: Border.all(color: const Color(0x66FFFFFF)),
                   ),
                 ),
               if (ballsLeft > 0) ...[
@@ -751,34 +755,48 @@ class _BottomBar extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(Gaps.sm, 0, Gaps.sm, Gaps.sm),
         child: ListenableBuilder(
           listenable: hud,
-          builder: (context, _) => Row(
-            children: [
-              for (final e in Element.values)
-                Expanded(
-                  child: _ElementButton(
-                    element: e,
-                    selected: hud.element == e,
-                    unlocked: hud.elements.contains(e),
-                    onTap: () => onElement(e),
-                  ),
-                ),
-              Container(
-                width: 3,
-                height: 40,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                color: const Color(0x551C1830),
+          // A glass tray on the forge floor, elements left, power-ups right.
+          builder: (context, _) => Container(
+            height: 60,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xB3262E5A), Color(0xD90A0D1F)],
               ),
-              for (final type in PowerUpType.values)
-                Expanded(
-                  child: _PowerUpButton(
-                    type: type,
-                    count: hud.inventory[type] ?? 0,
-                    available: hud.available[type] ?? false,
-                    active: hud.activeFraction[type] ?? 0,
-                    onTap: () => onPowerUp(type),
+              borderRadius: BorderRadius.circular(Radii.lg),
+              border: Border.all(color: const Color(0x2EFFFFFF)),
+            ),
+            child: Row(
+              children: [
+                for (final e in Element.values)
+                  Expanded(
+                    child: _ElementButton(
+                      element: e,
+                      selected: hud.element == e,
+                      unlocked: hud.elements.contains(e),
+                      onTap: () => onElement(e),
+                    ),
                   ),
+                Container(
+                  width: 1.5,
+                  height: 34,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  color: const Color(0x33FFFFFF),
                 ),
-            ],
+                for (final type in PowerUpType.values)
+                  Expanded(
+                    child: _PowerUpButton(
+                      type: type,
+                      count: hud.inventory[type] ?? 0,
+                      available: hud.available[type] ?? false,
+                      active: hud.activeFraction[type] ?? 0,
+                      onTap: () => onPowerUp(type),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -817,28 +835,31 @@ class _ElementButton extends StatelessWidget {
             scale: selected ? 1.12 : 0.92,
             duration: const Duration(milliseconds: 120),
             child: Container(
-              width: 44,
-              height: 44,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: unlocked
-                    ? (selected
-                          ? Color.lerp(color, Colors.black, 0.35)
-                          : const Color(0xFF203152))
-                    : const Color(0xFF3A4060),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: unlocked
+                      ? (selected
+                            ? [
+                                Color.lerp(color, Colors.black, 0.15)!,
+                                Color.lerp(color, Colors.black, 0.55)!,
+                              ]
+                            : const [Color(0xFF323B6C), Color(0xFF181D3D)])
+                      : const [Color(0xFF2A2F4C), Color(0xFF1C2038)],
+                ),
                 border: Border.all(
-                  color: selected ? Colors.white : Palette.outline,
-                  width: selected ? 3 : 2.5,
+                  color: selected ? Colors.white : const Color(0x33FFFFFF),
+                  width: selected ? 2.2 : 1.2,
                 ),
                 boxShadow: [
-                  const BoxShadow(
-                    color: Color(0x55000000),
-                    offset: Offset(0, 3),
-                  ),
                   if (selected)
                     BoxShadow(
-                      color: color.withValues(alpha: 0.8),
-                      blurRadius: 12,
+                      color: color.withValues(alpha: 0.7),
+                      blurRadius: 14,
                     ),
                 ],
               ),
@@ -887,25 +908,25 @@ class _PowerUpButton extends StatelessWidget {
         onTap: available ? onTap : null,
         child: Center(
           child: SizedBox(
-            width: 44,
-            height: 44,
+            width: 42,
+            height: 42,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: const Color(0xFF203152),
+                      borderRadius: BorderRadius.circular(13),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xFF323B6C), Color(0xFF181D3D)],
+                      ),
                       border: Border.all(
-                        color: isActive ? color : Palette.outline,
-                        width: isActive ? 3 : 2.5,
+                        color: isActive ? color : const Color(0x33FFFFFF),
+                        width: isActive ? 2.2 : 1.2,
                       ),
                       boxShadow: [
-                        const BoxShadow(
-                          color: Color(0x55000000),
-                          offset: Offset(0, 3),
-                        ),
                         if (isActive)
                           BoxShadow(
                             color: color.withValues(alpha: 0.6),
@@ -934,18 +955,18 @@ class _PowerUpButton extends StatelessWidget {
                   ),
                 ),
                 Positioned(
-                  right: -5,
-                  bottom: -5,
+                  right: -4,
+                  bottom: -4,
                   child: Container(
-                    width: 20,
-                    height: 20,
+                    width: 19,
+                    height: 19,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: count > 0
-                          ? Palette.coral
+                          ? Palette.ember
                           : const Color(0xFF3A4060),
                       shape: BoxShape.circle,
-                      border: Border.all(color: Palette.outline, width: 2),
+                      border: Border.all(color: Palette.background, width: 2),
                     ),
                     child: Text(
                       '$count',
@@ -1006,9 +1027,9 @@ class _DragHintState extends State<_DragHint>
             size: 52,
             shadows: [
               Shadow(
-                color: Palette.outline,
+                color: Color(0x99000000),
                 offset: Offset(0, 3),
-                blurRadius: 2,
+                blurRadius: 6,
               ),
             ],
           ),
@@ -1063,56 +1084,68 @@ class _StageIntroState extends State<_StageIntro>
             alignment: const Alignment(0, -0.3),
             child: Transform.scale(
               scale: 0.5 + 0.5 * appear,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Gaps.xl),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (level.slot == 1)
-                      Text(
-                        'CHAPTER ${chapter.number}',
-                        style: TextStyles.title.copyWith(
-                          fontSize: 18,
-                          color: Colors.white,
+              // A soft vignette keeps the card readable over boss art.
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  gradient: RadialGradient(
+                    radius: 0.75,
+                    colors: [Color(0x990A0D1F), Color(0x000A0D1F)],
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Gaps.xl,
+                    vertical: Gaps.xl,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (level.slot == 1)
+                        Text(
+                          'CHAPTER ${chapter.number}',
+                          style: TextStyles.title.copyWith(
+                            fontSize: 18,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                    Text(
-                      chapter.name.toUpperCase(),
-                      textAlign: TextAlign.center,
-                      style: TextStyles.title.copyWith(
-                        fontSize: 22,
-                        color: Palette.yellow,
-                      ),
-                    ),
-                    _BigLevelText(
-                      text: boss ? 'BOSS' : 'LEVEL ${widget.stage}',
-                      boss: boss,
-                    ),
-                    if (boss)
                       Text(
-                        level.boss!.name.toUpperCase(),
+                        chapter.name.toUpperCase(),
                         textAlign: TextAlign.center,
                         style: TextStyles.title.copyWith(
-                          fontSize: 24,
-                          color: Palette.coral,
+                          fontSize: 22,
+                          color: Palette.yellow,
                         ),
                       ),
-                    const SizedBox(height: 6),
-                    Text(
-                      stageHint(widget.stage),
-                      textAlign: TextAlign.center,
-                      style: TextStyles.heading.copyWith(fontSize: 18),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      level.animation.label.toUpperCase(),
-                      textAlign: TextAlign.center,
-                      style: TextStyles.caption.copyWith(
-                        color: Colors.white,
-                        shadows: TextStyles.outlined,
+                      _BigLevelText(
+                        text: boss ? 'BOSS' : 'LEVEL ${widget.stage}',
+                        boss: boss,
                       ),
-                    ),
-                  ],
+                      if (boss)
+                        Text(
+                          level.boss!.name.toUpperCase(),
+                          textAlign: TextAlign.center,
+                          style: TextStyles.title.copyWith(
+                            fontSize: 24,
+                            color: Palette.coral,
+                          ),
+                        ),
+                      const SizedBox(height: 6),
+                      Text(
+                        stageHint(widget.stage),
+                        textAlign: TextAlign.center,
+                        style: TextStyles.heading.copyWith(fontSize: 18),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        level.animation.label.toUpperCase(),
+                        textAlign: TextAlign.center,
+                        style: TextStyles.caption.copyWith(
+                          color: Colors.white,
+                          shadows: TextStyles.outlined,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1123,7 +1156,8 @@ class _StageIntroState extends State<_StageIntro>
   }
 }
 
-/// Italic blue lettering with a yellow rim, the stage title style.
+/// Forged-metal title lettering: molten gold for progress, hot red for
+/// bosses and defeat, with a bevel split and an ember rule underneath.
 class _BigLevelText extends StatelessWidget {
   const _BigLevelText({required this.text, this.boss = false});
   final String text;
@@ -1131,45 +1165,73 @@ class _BigLevelText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = TextStyle(
+    const style = TextStyle(
       fontFamily: TextStyles.display,
-      fontSize: 64,
+      fontSize: 52,
       height: 1.05,
+      letterSpacing: 1,
     );
-    return Transform(
-      alignment: Alignment.center,
-      transform: Matrix4.skewX(-0.12),
-      child: Stack(
+    final accent = boss ? Palette.coral : Palette.ember;
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            text,
-            style: style.copyWith(
-              foreground: Paint()
-                ..style = PaintingStyle.stroke
-                ..strokeWidth = 16
-                ..strokeJoin = StrokeJoin.round
-                ..color = Palette.outline,
-            ),
+          Stack(
+            children: [
+              Text(
+                text,
+                style: style.copyWith(
+                  foreground: Paint()
+                    ..style = PaintingStyle.stroke
+                    ..strokeWidth = 9
+                    ..strokeJoin = StrokeJoin.round
+                    ..color = Palette.outline,
+                  shadows: const [
+                    Shadow(
+                      color: Color(0x99000000),
+                      offset: Offset(0, 5),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+              ),
+              ShaderMask(
+                shaderCallback: (r) => LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0, 0.5, 0.52, 1],
+                  colors: boss
+                      ? const [
+                          Color(0xFFFFE1DC),
+                          Color(0xFFFF8A86),
+                          Color(0xFFFF5D6C),
+                          Color(0xFFB71C3A),
+                        ]
+                      : const [
+                          Color(0xFFFFF5C8),
+                          Color(0xFFFFC94A),
+                          Color(0xFFFFA22E),
+                          Color(0xFFE2541A),
+                        ],
+                ).createShader(r),
+                child: Text(text, style: style.copyWith(color: Colors.white)),
+              ),
+            ],
           ),
-          Text(
-            text,
-            style: style.copyWith(
-              foreground: Paint()
-                ..style = PaintingStyle.stroke
-                ..strokeWidth = 8
-                ..strokeJoin = StrokeJoin.round
-                ..color = Palette.yellow,
+          Container(
+            width: 150,
+            height: 3,
+            margin: const EdgeInsets.only(top: 4),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  accent.withValues(alpha: 0),
+                  accent,
+                  accent.withValues(alpha: 0),
+                ],
+              ),
             ),
-          ),
-          ShaderMask(
-            shaderCallback: (r) => LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: boss
-                  ? const [Color(0xFFFFA0A0), Color(0xFFE5243B)]
-                  : const [Color(0xFF5AB2FF), Color(0xFF1336D6)],
-            ).createShader(r),
-            child: Text(text, style: style.copyWith(color: Colors.white)),
           ),
         ],
       ),
@@ -1190,7 +1252,7 @@ class _Scrim extends StatelessWidget {
       duration: const Duration(milliseconds: 240),
       curve: Curves.easeOutCubic,
       builder: (context, t, child) => ColoredBox(
-        color: Color.fromRGBO(10, 14, 40, 0.6 * t),
+        color: Color.fromRGBO(10, 13, 31, 0.72 * t),
         child: Opacity(
           opacity: t,
           child: Transform.scale(scale: 0.9 + 0.1 * t, child: child),
@@ -1318,15 +1380,25 @@ class _QuickToggle extends StatelessWidget {
         onTap: onTap,
         child: Column(
           children: [
-            Container(
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: on ? Palette.blue : const Color(0xFF3A4060),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Palette.outline, width: 3),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: on
+                      ? const [Color(0xFFFFB443), Color(0xFFE2541A)]
+                      : const [Color(0xFF323B6C), Color(0xFF181D3D)],
+                ),
+                borderRadius: BorderRadius.circular(17),
+                border: Border.all(color: const Color(0x40FFFFFF)),
+                boxShadow: on
+                    ? Elevation.glow(Palette.ember, strength: 0.4)
+                    : Elevation.control,
               ),
-              child: Icon(icon, color: Colors.white),
+              child: Icon(icon, color: on ? Colors.white : Palette.textMuted),
             ),
             const SizedBox(height: 4),
             Text(
@@ -1364,12 +1436,14 @@ class _Stars extends StatelessWidget {
                 child: Icon(
                   Icons.star_rounded,
                   size: i == 1 ? 76 : 60,
-                  color: i < count ? Palette.yellow : const Color(0x553A4060),
-                  shadows: const [
-                    Shadow(color: Palette.outline, offset: Offset(0, 3)),
-                    Shadow(color: Palette.outline, offset: Offset(2, 0)),
-                    Shadow(color: Palette.outline, offset: Offset(-2, 0)),
-                    Shadow(color: Palette.outline, offset: Offset(0, -2)),
+                  color: i < count ? Palette.gold : const Color(0x33FFFFFF),
+                  shadows: [
+                    if (i < count)
+                      const Shadow(color: Color(0xAAFF7A2B), blurRadius: 16),
+                    const Shadow(
+                      color: Color(0x99000000),
+                      offset: Offset(0, 3),
+                    ),
                   ],
                 ),
               ),

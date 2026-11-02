@@ -1,9 +1,10 @@
 # BOOMFORGE — Break the World
 
-An original 2.5D cartoon arcade shooter built with Flutter and Flame. Drag a
-wheeled field cannon along the grass, blast large faceted crystals that
-split as they break, and set off **chain reactions** by shooting volatile
-crystals floating in the sky.
+An original 2.5D arcade shooter built with Flutter and Flame. Steer the
+Forge Strider, a hovering turret, along a forged-stone platform, blast large
+faceted crystals that split as they break, and set off **chain reactions** by
+shooting volatile crystals floating in the sky. The look and its sources are
+described in [docs/VISUAL_IDENTITY.md](docs/VISUAL_IDENTITY.md).
 
 Everything works offline. Ads are optional (Google AdMob, test IDs in
 development builds).

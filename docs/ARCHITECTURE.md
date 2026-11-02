@@ -101,10 +101,11 @@ How a level reaches the simulation:
 - The arena is always 360 world units wide; height follows the screen
   (clamped 560–900). One scale maps world → pixels; the ground band is
   anchored to the bottom of the screen.
-- **World:** five layers (sky, clouds, far mountains, mid ridge with pines,
-  hills) are each rasterised once into an image (`_Baked`) and drawn with a
-  parallax offset driven by the cannon's position; clouds also drift. The
-  grass ground is a sixth image. See docs/PERFORMANCE_AUDIT.md.
+- **World:** five layers (sky with ringed sun, haze bands, far mesas, basalt
+  column clusters, faceted foothills) are each rasterised once into an image
+  (`_Baked`) and drawn with a parallax offset driven by the cannon's
+  position; the haze also drifts. The forged-stone platform is a sixth
+  image. See docs/PERFORMANCE_AUDIT.md and docs/VISUAL_IDENTITY.md.
 - **Art** is procedural and cached: gem bodies, rock shells and glows are
   rasterised once per (colour, size) into sprites (`CrystalArt._sprite`) and
   drawn as images; faceted gems use pre-lit facet paints

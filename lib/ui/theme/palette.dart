@@ -1,36 +1,48 @@
 import 'package:flutter/material.dart';
 
-/// Design tokens for the whole game. Colours, spacing, radii and type.
+/// Design tokens for the whole game: the "Forge" look. Deep iron-indigo
+/// glass panels, molten ember and brass accents, soft shadows instead of
+/// hard cartoon outlines.
 abstract final class Palette {
-  static const background = Color(0xFF1B2D5C);
-  static const backgroundTop = Color(0xFF24407A);
+  static const background = Color(0xFF0F1428);
+  static const backgroundTop = Color(0xFF1B2246);
 
-  // Cartoon slate-blue panels with a thick dark outline.
-  static const panel = Color(0xFF1F3466);
-  static const panelLight = Color(0xFF2C4A8C);
-  static const panelBorder = Color(0xFF15172E);
-  static const panelInset = Color(0xFF162650);
-  static const outline = Color(0xFF15172E);
+  // Iron-glass panels with a light rim.
+  static const panel = Color(0xFF1A2042);
+  static const panelLight = Color(0xFF29315E);
+  static const panelBorder = Color(0xFF414C86);
+  static const panelInset = Color(0xFF111633);
 
-  // Warm "wood" panels for lists and rewards.
-  static const wood = Color(0xFFB8733C);
-  static const woodLight = Color(0xFFD9944F);
-  static const woodDark = Color(0xFF7A4520);
+  /// Deep ink used for strokes, text shadows and recessed wells.
+  static const outline = Color(0xFF0A0D1F);
 
-  static const cyan = Color(0xFF3DC8FF);
-  static const blue = Color(0xFF2F7BFF);
-  static const yellow = Color(0xFFFFCF2E);
+  // Warm "forge" panels for results and rewards (names kept from the
+  // earlier wood style).
+  static const wood = Color(0xFF261C3A);
+  static const woodLight = Color(0xFF3A2B52);
+  static const woodDark = Color(0xFFB8803A);
+
+  static const cyan = Color(0xFF3FD8E8);
+  static const blue = Color(0xFF4C7DFF);
+  static const yellow = Color(0xFFFFD15C);
   static const orange = Color(0xFFFF8A3D);
-  static const coral = Color(0xFFFF5A5F);
-  static const purple = Color(0xFFA35CFF);
-  static const green = Color(0xFF3FD96B);
-  static const gold = Color(0xFFFFC43D);
+  static const coral = Color(0xFFFF5D6C);
+  static const purple = Color(0xFFA46BFF);
+  static const green = Color(0xFF3EDB8A);
+  static const gold = Color(0xFFFFC24A);
+
+  /// Molten accent: the forge glow behind the brand.
+  static const ember = Color(0xFFFF7A2B);
+
+  /// Polished brass trim on panels and frames.
+  static const brass = Color(0xFFE2B15C);
 
   static const text = Colors.white;
-  static const textMuted = Color(0xFFC9D6FF);
-  static const textDim = Color(0xFF6B78B3);
+  static const textMuted = Color(0xFFB8BFE6);
+  static const textDim = Color(0xFF6D76A8);
 
-  /// Ball colours by size tier (0 = smallest).
+  /// Ball colours by size tier (0 = smallest). These tell the player how big
+  /// a crystal is, so they stay fixed.
   static const ballTiers = [
     Color(0xFF3DA9FF), // sapphire
     Color(0xFF34D27A), // emerald
@@ -50,57 +62,86 @@ abstract final class Gaps {
 }
 
 abstract final class Radii {
-  static const sm = 10.0;
-  static const md = 14.0;
-  static const lg = 20.0;
+  static const sm = 12.0;
+  static const md = 16.0;
+  static const lg = 22.0;
+  static const xl = 28.0;
+}
+
+/// Shadows shared by every raised surface.
+abstract final class Elevation {
+  static const panel = [
+    BoxShadow(
+      color: Color(0x73000000),
+      offset: Offset(0, 10),
+      blurRadius: 24,
+      spreadRadius: -6,
+    ),
+  ];
+
+  static const control = [
+    BoxShadow(color: Color(0x59000000), offset: Offset(0, 5), blurRadius: 12),
+  ];
+
+  /// Coloured under-glow for a raised control of [color].
+  static List<BoxShadow> glow(Color color, {double strength = 0.45}) => [
+    BoxShadow(
+      color: color.withValues(alpha: strength),
+      offset: const Offset(0, 6),
+      blurRadius: 18,
+      spreadRadius: -4,
+    ),
+  ];
 }
 
 abstract final class TextStyles {
-  static const display = 'LilitaOne';
+  static const display = 'RussoOne';
 
-  /// Cartoon outline: eight hard dark shadows around the glyphs plus a
-  /// drop shadow. Keeps white text readable over the bright world.
+  /// Soft ink shadow that keeps white text readable over the world art
+  /// without a hard cartoon outline.
   static const outlined = [
-    Shadow(color: Palette.outline, offset: Offset(1.6, 0)),
-    Shadow(color: Palette.outline, offset: Offset(-1.6, 0)),
-    Shadow(color: Palette.outline, offset: Offset(0, 1.6)),
-    Shadow(color: Palette.outline, offset: Offset(0, -1.6)),
-    Shadow(color: Palette.outline, offset: Offset(1.2, 1.2)),
-    Shadow(color: Palette.outline, offset: Offset(-1.2, 1.2)),
-    Shadow(color: Palette.outline, offset: Offset(1.2, -1.2)),
-    Shadow(color: Palette.outline, offset: Offset(-1.2, -1.2)),
-    Shadow(color: Palette.outline, offset: Offset(0, 3.2)),
+    Shadow(color: Color(0xCC0A0D1F), offset: Offset(0, 1.5)),
+    Shadow(color: Color(0x800A0D1F), offset: Offset(0, 3), blurRadius: 8),
   ];
 
   static const title = TextStyle(
     fontFamily: display,
-    fontSize: 30,
+    fontSize: 26,
     color: Palette.text,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     shadows: outlined,
   );
 
   static const heading = TextStyle(
     fontFamily: display,
-    fontSize: 22,
-    color: Palette.text,
-    letterSpacing: 0.3,
-    shadows: outlined,
-  );
-
-  static const button = TextStyle(
-    fontFamily: display,
-    fontSize: 22,
+    fontSize: 19,
     color: Palette.text,
     letterSpacing: 0.4,
     shadows: outlined,
   );
 
+  static const button = TextStyle(
+    fontFamily: display,
+    fontSize: 19,
+    color: Palette.text,
+    letterSpacing: 0.6,
+    shadows: outlined,
+  );
+
   static const number = TextStyle(
     fontFamily: display,
-    fontSize: 20,
+    fontSize: 18,
     color: Palette.text,
+    letterSpacing: 0.3,
     shadows: outlined,
+  );
+
+  /// Small spaced capitals for labels above values.
+  static const eyebrow = TextStyle(
+    fontFamily: display,
+    fontSize: 11,
+    color: Palette.brass,
+    letterSpacing: 2,
   );
 
   static const body = TextStyle(
@@ -143,9 +184,10 @@ ThemeData buildAppTheme() {
     brightness: Brightness.dark,
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(
-      seedColor: Palette.blue,
+      seedColor: Palette.ember,
       brightness: Brightness.dark,
       surface: Palette.panel,
+      primary: Palette.gold,
     ),
     scaffoldBackgroundColor: Palette.background,
   );
@@ -158,7 +200,7 @@ ThemeData buildAppTheme() {
       backgroundColor: Palette.panel,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.all(Radius.circular(Radii.lg)),
-        side: BorderSide(color: Palette.panelBorder, width: 2),
+        side: BorderSide(color: Palette.panelBorder),
       ),
     ),
     snackBarTheme: const SnackBarThemeData(
@@ -170,15 +212,18 @@ ThemeData buildAppTheme() {
       thumbColor: const WidgetStatePropertyAll(Colors.white),
       trackColor: WidgetStateProperty.resolveWith(
         (s) => s.contains(WidgetState.selected)
-            ? Palette.green
-            : const Color(0xFF3A4475),
+            ? Palette.ember
+            : const Color(0xFF2C3361),
       ),
       trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
     ),
     sliderTheme: const SliderThemeData(
-      activeTrackColor: Palette.cyan,
+      activeTrackColor: Palette.gold,
       thumbColor: Colors.white,
-      inactiveTrackColor: Color(0xFF2A3570),
+      inactiveTrackColor: Color(0xFF2C3361),
+    ),
+    progressIndicatorTheme: const ProgressIndicatorThemeData(
+      color: Palette.gold,
     ),
   );
 }

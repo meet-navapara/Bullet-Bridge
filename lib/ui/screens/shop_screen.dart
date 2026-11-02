@@ -270,15 +270,20 @@ class _Tabs extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       gradient: i == index
                           ? const LinearGradient(
-                              colors: [Color(0xFF4FA8FF), Color(0xFF2569F0)],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Color(0xFFFFD36B), Color(0xFFFF9A2E)],
                             )
                           : null,
                     ),
                     child: Text(
                       labels[i],
                       style: TextStyles.button.copyWith(
-                        fontSize: 18,
-                        color: i == index ? Colors.white : Palette.textMuted,
+                        fontSize: 16,
+                        color: i == index
+                            ? const Color(0xFF3A1C00)
+                            : Palette.textMuted,
+                        shadows: i == index ? const [] : null,
                       ),
                     ),
                   ),
@@ -381,7 +386,7 @@ class _ShopCard extends StatelessWidget {
                   color: selected
                       ? Palette.yellow.withValues(alpha: 0.2)
                       : owned
-                      ? Palette.blue.withValues(alpha: 0.35)
+                      ? Palette.panelBorder.withValues(alpha: 0.6)
                       : Palette.panelInset,
                   borderRadius: BorderRadius.circular(10),
                 ),

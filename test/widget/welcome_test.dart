@@ -125,7 +125,7 @@ void main() {
       dir = dir.parent;
     }
     final fonts = '${dir.path}/material_fonts';
-    await load('LilitaOne', ['assets/fonts/LilitaOne-Regular.ttf']);
+    await load('RussoOne', ['assets/fonts/RussoOne-Regular.ttf']);
     await load('Roboto', [
       '$fonts/roboto-regular.ttf',
       '$fonts/roboto-medium.ttf',
