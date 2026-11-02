@@ -22,6 +22,22 @@
           }
         },
         {
+          "client_id": "182359966028-gjfpul2vb4ep3rnd7tl4smuncslih8s5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.boomforge.game",
+            "certificate_hash": "c9506498de9e8c1aee3a85bb5c43266bd7b07605"
+          }
+        },
+        {
+          "client_id": "182359966028-nk2c1mfquffi6psffu6t483il85v49vh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.boomforge.game",
+            "certificate_hash": "0da45afd1781caccf55c587eaad99c57ed0873d6"
+          }
+        },
+        {
           "client_id": "182359966028-u68md270fm7mk9oe0f1rm94lojjvdeo2.apps.googleusercontent.com",
           "client_type": 3
         }

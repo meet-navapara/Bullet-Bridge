@@ -85,6 +85,7 @@ class FirebaseCloudBackend implements CloudBackend {
     try {
       return await _linkGoogle();
     } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase sign-in failed: ${e.code} ${e.message}');
       throw CloudFailure(_message(e));
     }
   }
@@ -102,8 +103,8 @@ class FirebaseCloudBackend implements CloudBackend {
   /// Shows the phone's own Google account sheet, so no web page or Firebase
   /// address appears. The web client ID comes from google-services.json.
   Future<AuthCredential> _googleCredential() async {
-    await (_googleReady ??= GoogleSignIn.instance.initialize());
     try {
+      await (_googleReady ??= GoogleSignIn.instance.initialize());
       final account = await GoogleSignIn.instance.authenticate();
       final idToken = account.authentication.idToken;
       if (idToken == null) {
@@ -117,8 +118,12 @@ class FirebaseCloudBackend implements CloudBackend {
           throw const CloudCancelled();
         default:
           debugPrint('Google sign-in failed: ${e.code} ${e.description}');
+          // The reason decides the fix (usually a missing fingerprint), so
+          // show it: this is all a tester can report.
+          final reason = e.description ?? e.code.name;
           throw CloudFailure(
-            'Google sign-in failed (${e.code.name}). Try again.',
+            'Google sign-in failed: '
+            '${reason.length > 110 ? reason.substring(0, 110) : reason}',
           );
       }
     }

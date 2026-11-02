@@ -26,10 +26,10 @@ CHAIN REACTIONS
 • Longer chains pay bonus coins
 
 1000 LEVELS, 10 WORLDS
-Travel from the Crystal Highlands to World's Edge, then on through nine more worlds. Early chapters bring new enemies and mechanics, one at a time, and every chapter ends with a boss fight. Every level has its own animated sky.
+Travel from the Crystal Highlands to World's Edge, then return to every world in new colours. Early chapters bring new enemies and mechanics, one at a time, and every chapter ends with a boss fight. Every level has its own animated sky.
 
 100 BOSS FIGHTS
-Learn the attacks of the Crystal Colossus, Storm Engine, Molten Titan and more, right up to the four-phase Worldbreaker, then face their tougher variants.
+Bosses keep throwing crystal balls at you, and every one you smash drains their health. Survive the Crystal Colossus, Storm Engine, Molten Titan and more, right up to the four-phase Worldbreaker, then face their tougher variants.
 
 4 ELEMENTS
 Switch any time between Kinetic, Fire, Ice and Shock. Find what each crystal is weak to.

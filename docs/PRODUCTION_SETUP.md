@@ -48,7 +48,11 @@ flutter build appbundle --release --dart-define-from-file=release.json
 
    The build stops with an error if the upload key or any ID is missing,
    malformed, one of Google's samples, or from a different publisher. For a
-   deliberately ad-free release, set `"ADS_DISABLED": "true"` instead.
+   deliberately ad-free release, set `"ADS_DISABLED": "true"` instead. For a
+   release with interstitials only, set `"ADS_NO_REWARDED": "true"` and leave
+   out the rewarded ID; the "watch ad" buttons stay hidden. To add rewarded
+   ads later, remove that line, add the ID, and put "Watching a rewarded ad is
+   always your choice." back in `docs/STORE_LISTING.md`.
 4. iOS app ID: replace `GADApplicationIdentifier` in `ios/Runner/Info.plist`
    and add Google's `SKAdNetworkItems` list.
 5. iOS unit IDs are passed at build time:

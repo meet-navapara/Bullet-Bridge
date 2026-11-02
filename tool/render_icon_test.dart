@@ -24,15 +24,52 @@ void main() {
         _background(c);
         _artwork(c);
       });
-      // Adaptive icon foreground: artwork scaled into the 66% safe zone.
-      await _write('assets/icon/icon_foreground.png', (c) {
+      // Adaptive icon: the same picture split into two layers. Launchers show
+      // only the middle two thirds of each layer.
+      await _write('assets/icon/icon_background.png', _adaptiveBackground);
+      await _write('assets/icon/icon_foreground.png', _adaptiveForeground);
+      // What a round launcher shows, for checking by eye.
+      Directory('build').createSync(recursive: true);
+      await _write('build/icon_preview.png', (c) {
         c.translate(size / 2, size / 2);
-        c.scale(0.64);
+        c.scale(1.5);
         c.translate(-size / 2, -size / 2);
-        _artwork(c);
+        c.clipPath(
+          Path()..addOval(
+            Rect.fromCircle(
+              center: const Offset(size / 2, size / 2),
+              radius: size / 3,
+            ),
+          ),
+        );
+        _adaptiveBackground(c);
+        _adaptiveForeground(c);
       });
     });
   });
+}
+
+/// Fits the whole artwork inside the circle every launcher mask shows.
+const double _adaptiveScale = 0.62;
+
+void _adaptiveBackground(Canvas c) {
+  // The same horizon as icon.png once the artwork is scaled.
+  final groundTop = size / 2 + (size * 0.8 - size / 2) * _adaptiveScale;
+  WorldArt.paintScene(
+    c,
+    const Size(size, size),
+    Catalog.themes.first,
+    groundTop: groundTop,
+  );
+}
+
+void _adaptiveForeground(Canvas c) {
+  c.save();
+  c.translate(size / 2, size / 2);
+  c.scale(_adaptiveScale);
+  c.translate(-size / 2, -size / 2);
+  _artwork(c);
+  c.restore();
 }
 
 Future<void> _write(String path, void Function(Canvas) paint) async {

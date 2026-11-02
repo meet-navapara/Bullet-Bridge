@@ -41,9 +41,10 @@ if (gradle.startParameter.taskNames.any { it.endsWith("bundleRelease") }) {
     val problems = buildList {
         if (!hasReleaseKey) add("android/key.properties is missing (upload key)")
         if (dartDefines["ADS_DISABLED"] != "true") {
-            val keys = listOf(
+            // `ADS_NO_REWARDED=true` is the deliberate interstitial-only release.
+            val keys = listOfNotNull(
                 "ADMOB_APP_ID_ANDROID",
-                "ADMOB_REWARDED_ANDROID",
+                "ADMOB_REWARDED_ANDROID".takeIf { dartDefines["ADS_NO_REWARDED"] != "true" },
                 "ADMOB_INTERSTITIAL_ANDROID",
             )
             val publishers = keys.map { key ->
